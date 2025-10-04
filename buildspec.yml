@@ -19,7 +19,7 @@ phases:
       - echo Creating deployment package...
       - echo Removing dev dependencies...
       - rm -rf node_modules
-      - npm ci --omit=dev
+      - npm ci
 
 artifacts:
   files:
