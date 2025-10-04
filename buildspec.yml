@@ -17,7 +17,10 @@ phases:
     commands:
       - echo "Preparing deployment artifacts..."
       - mkdir -p build_artifacts
-      - cp -r .next node_modules public package.json package-lock.json ecosystem.config.cjs appspec.yml scripts nginx build_artifacts/
+      - echo "Copying required files..."
+      - cp -r .next node_modules package.json package-lock.json appspec.yml scripts nginx build_artifacts/
+      - cp -r app lib components redux styles build_artifacts/
+      - cp ecosystem.config.cjs next.config.cjs middleware.ts build_artifacts/
 
 artifacts:
   files:
