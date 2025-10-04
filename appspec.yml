@@ -30,6 +30,9 @@ hooks:
     - location: scripts/after_install.sh
       timeout: 300
       runas: ubuntu
+    - location: scripts/configure_nginx.sh
+      timeout: 300
+      runas: root
       
   ApplicationStart:
     - location: scripts/start_server.sh
