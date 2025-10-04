@@ -17,10 +17,17 @@ phases:
     commands:
       - echo Post-build phase...
       - echo Creating deployment package...
+      - echo Removing dev dependencies...
+      - rm -rf node_modules
+      - npm ci --omit=dev
 
 artifacts:
   files:
     - '**/*'
+  excludes:
+    - 'node_modules/.cache/**/*'
+    - '.git/**/*'
+    - '.github/**/*'
   name: admin-build-$(date +%Y-%m-%d-%H-%M-%S)
   
 cache:

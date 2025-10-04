@@ -6,24 +6,13 @@ echo "===== After Install Script Started ====="
 # Navigate to application directory
 cd /var/www/admin
 
-# Check if dependencies need to be installed
-INSTALL_DEPS=false
-
-if [ ! -d "node_modules" ]; then
-    echo "node_modules not found, will install dependencies..."
-    INSTALL_DEPS=true
-elif [ "package.json" -nt "node_modules" ]; then
-    echo "package.json is newer than node_modules, will update dependencies..."
-    INSTALL_DEPS=true
-else
-    echo "Dependencies are up to date, skipping npm install..."
+# Verify build artifacts exist
+if [ ! -d ".next" ]; then
+    echo "ERROR: .next directory not found. Build may have failed."
+    exit 1
 fi
 
-# Install dependencies only if needed
-if [ "$INSTALL_DEPS" = true ]; then
-    echo "Installing Node.js dependencies..."
-    npm ci --omit=dev
-fi
+echo "Build artifacts found, deployment package is ready..."
 
 # Set environment variables (create .env file if needed)
 if [ ! -f /var/www/admin/.env ]; then
