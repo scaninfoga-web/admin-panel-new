@@ -32,9 +32,30 @@ else
     echo "PM2 is already installed: $(pm2 -v)"
 fi
 
-# Create application directory if it doesn't exist
+# Clean up old deployment to avoid file conflicts
+echo "Cleaning up old deployment..."
+if [ -d "/var/www/admin" ]; then
+    # Backup .env file if it exists
+    if [ -f "/var/www/admin/.env" ]; then
+        cp /var/www/admin/.env /tmp/admin.env.backup
+        echo "Backed up .env file"
+    fi
+    
+    # Remove entire directory
+    rm -rf /var/www/admin
+    echo "Old deployment removed"
+fi
+
+# Create fresh application directory
 echo "Creating application directory..."
 mkdir -p /var/www/admin
+
+# Restore .env file if it was backed up
+if [ -f "/tmp/admin.env.backup" ]; then
+    cp /tmp/admin.env.backup /var/www/admin/.env
+    rm /tmp/admin.env.backup
+    echo "Restored .env file"
+fi
 
 # Set proper ownership
 chown -R ubuntu:ubuntu /var/www/admin
