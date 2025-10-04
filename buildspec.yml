@@ -3,10 +3,9 @@ version: 0.2
 phases:
   install:
     runtime-versions:
-      nodejs: 18
+      nodejs: 20
     commands:
       - echo "Installing dependencies..."
-      - rm -rf node_modules package-lock.json
       - npm ci
 
   build:
@@ -18,7 +17,7 @@ phases:
     commands:
       - echo "Preparing deployment artifacts..."
       - mkdir -p build_artifacts
-      - cp -r .next node_modules public package.json ecosystem.config.js appspec.yml scripts nginx build_artifacts/
+      - cp -r .next node_modules public package.json package-lock.json ecosystem.config.cjs appspec.yml scripts nginx build_artifacts/
 
 artifacts:
   files:
