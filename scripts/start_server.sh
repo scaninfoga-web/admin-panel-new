@@ -8,8 +8,8 @@ cd /var/www/admin
 
 # Start Next.js application with PM2 using ecosystem file
 echo "Starting Next.js application with PM2..."
-if [ -f ecosystem.config.js ]; then
-    pm2 start ecosystem.config.js
+if [ -f ecosystem.config.cjs ]; then
+    pm2 start ecosystem.config.cjs
 else
     pm2 start npm --name "admin-app" -- start
 fi
