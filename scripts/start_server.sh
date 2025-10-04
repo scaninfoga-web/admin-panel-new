@@ -6,10 +6,6 @@ echo "===== Start Server Script Started ====="
 # Navigate to application directory
 cd /var/www/admin
 
-# Create PM2 log directory if it doesn't exist
-mkdir -p /var/log/pm2
-chown -R ubuntu:ubuntu /var/log/pm2
-
 # Start Next.js application with PM2 using ecosystem file
 echo "Starting Next.js application with PM2..."
 if [ -f ecosystem.config.js ]; then

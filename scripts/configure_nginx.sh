@@ -25,6 +25,11 @@ fi
 echo "Testing nginx configuration..."
 nginx -t
 
+# Create PM2 log directory
+echo "Creating PM2 log directory..."
+mkdir -p /var/log/pm2
+chown -R ubuntu:ubuntu /var/log/pm2
+
 # Set proper ownership for application directory
 echo "Setting proper ownership..."
 chown -R ubuntu:ubuntu /var/www/admin
