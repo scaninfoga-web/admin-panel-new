@@ -20,14 +20,5 @@ pm2 save
 # Setup PM2 to start on system boot
 pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
 
-# Start nginx
-echo "Starting nginx..."
-systemctl start nginx
-systemctl enable nginx
-
-# Reload nginx to apply configuration
-systemctl reload nginx
-
 echo "===== Start Server Script Completed ====="
 echo "Application is now running on port 3000"
-echo "Nginx is proxying requests from port 80/443 to the application"
