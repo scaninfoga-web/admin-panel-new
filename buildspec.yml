@@ -1,39 +1,25 @@
 version: 0.2
 
 phases:
-  pre_build:
+  install:
+    runtime-versions:
+      nodejs: 18
     commands:
-      - echo Installing dependencies...
-      - npm install
-      
+      - echo "Installing dependencies..."
+      - npm ci
+
   build:
     commands:
-      - echo Build started on `date`
-      - echo Building Next.js application...
+      - echo "Building Next.js app..."
       - npm run build
-      - echo Build completed on `date`
-      
+
   post_build:
     commands:
-      - echo Post-build phase...
-      - echo Creating deployment package...
-      - echo Reinstalling all dependencies...
-      - rm -rf node_modules
-      - npm ci
-      - echo Verifying build artifacts...
-      - ls -la .next/
-      - test -f .next/BUILD_ID && echo "Build ID found" || exit 1
+      - echo "Preparing deployment artifacts..."
+      - mkdir -p build_artifacts
+      - cp -r .next node_modules public package.json ecosystem.config.js appspec.yml scripts nginx build_artifacts/
 
 artifacts:
   files:
     - '**/*'
-  excludes:
-    - 'node_modules/.cache/**/*'
-    - '.git/**/*'
-    - '.github/**/*'
-  name: admin-build-$(date +%Y-%m-%d-%H-%M-%S)
-  
-cache:
-  paths:
-    - 'node_modules/**/*'
-    - '.next/cache/**/*'
+  base-directory: build_artifacts
