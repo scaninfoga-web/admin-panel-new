@@ -40,6 +40,7 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
         cat <<EOT > /home/ubuntu/admin-app/.env
+        PORT=3001
         NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
         EOT
         EOF
