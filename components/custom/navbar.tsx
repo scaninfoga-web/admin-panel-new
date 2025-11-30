@@ -80,9 +80,9 @@ const Navbar: React.FC = () => {
   return (
     <header className="w-full fixed top-0 bg-background px-6 z-10 border-b">
       <div className="w-full flex items-center justify-between">
-        <div>
+        <div className="mb-2">
           <Image
-            src="https://website-stuff-logos.s3.ap-south-1.amazonaws.com/1.png"
+            src="https://d29bvka1s4r8lj.cloudfront.net/upper_logo.png"
             alt="scaninfoga"
             width={200}
             height={0}
