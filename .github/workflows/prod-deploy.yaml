@@ -48,6 +48,19 @@ jobs:
     - name: Install dependencies and build on EC2
       run: |
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+          export PATH="$HOME/.bun/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH"
+
+          # Install bun if not available
+          if ! command -v bun &> /dev/null; then
+            curl -fsSL https://bun.sh/install | bash
+            export PATH="$HOME/.bun/bin:$PATH"
+          fi
+
+          # Install pm2 globally if not available
+          if ! command -v pm2 &> /dev/null; then
+            bun install -g pm2
+          fi
+
           cd /home/ubuntu/admin-app
           bun install
           bun run build
@@ -56,6 +69,8 @@ jobs:
     - name: Deploy with PM2 on EC2
       run: |
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+          export PATH="$HOME/.bun/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH"
+
           cd /home/ubuntu/admin-app
           pm2 delete admin-app || true
           PORT=3001 pm2 start "bun run start" --name admin-app
