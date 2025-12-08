@@ -74,7 +74,7 @@ jobs:
 
           cd /home/ubuntu/admin-app
           pm2 delete admin-app || true
-          PORT=3001 pm2 start "bun run start" --name admin-app
+          PORT=3001 pm2 start /home/ubuntu/.bun/bin/bun --name admin-app -- run start
           pm2 save
           pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
         EOF
