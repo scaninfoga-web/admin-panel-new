@@ -1,5 +1,5 @@
 # Build stage
-FROM oven/bun:slim AS builder
+FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
@@ -11,21 +11,19 @@ COPY . .
 
 RUN bun run build
 
-# Production stage - minimal image
-FROM oven/bun:slim AS runner
+# Production stage
+FROM oven/bun:1-slim AS runner
 
 WORKDIR /app
 
-# Create non-root user and clean up
+# Create non-root user
 RUN groupadd --system --gid 1001 nodejs && \
-    useradd --system --uid 1001 --gid nodejs --shell /bin/false nextjs && \
-    rm -rf /usr/bin/wget /usr/bin/curl 2>/dev/null || true
+    useradd --system --uid 1001 --gid nodejs --shell /bin/false nextjs
 
-# Copy standalone build
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-
-# Copy public folder if it exists
+# Copy necessary files
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 
 # Set ownership
@@ -37,6 +35,5 @@ EXPOSE 3001
 
 ENV NODE_ENV=production
 ENV PORT=3001
-ENV HOSTNAME="0.0.0.0"
 
-CMD ["bun", "server.js"]
+CMD ["bun", "run", "start"]
