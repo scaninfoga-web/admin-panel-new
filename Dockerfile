@@ -16,17 +16,10 @@ FROM oven/bun:slim AS runner
 
 WORKDIR /app
 
-# Remove potentially dangerous tools
-RUN apt-get update && \
-    apt-get remove -y --allow-remove-essential wget curl && \
-    apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
+# Create non-root user and clean up
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid nodejs --shell /bin/false nextjs && \
     rm -rf /usr/bin/wget /usr/bin/curl 2>/dev/null || true
-
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
 
 # Copy only necessary files from builder
 COPY --from=builder /app/public ./public
