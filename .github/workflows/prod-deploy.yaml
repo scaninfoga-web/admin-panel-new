@@ -71,7 +71,6 @@ jobs:
       run: |
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
           export PATH="$HOME/.bun/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH"
-
           cd /home/ubuntu/admin-app
           pm2 delete admin-app || true
           PORT=3001 pm2 start "bun run start" --name admin-app
