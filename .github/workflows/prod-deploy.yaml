@@ -36,7 +36,6 @@ jobs:
           ./ \
           ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/admin-app/
 
-          
     - name: Create .env file on EC2
       run: |
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
@@ -50,23 +49,22 @@ jobs:
     - name: Install dependencies and build on EC2
       run: |
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
-          export BUN_PATH="/home/ubuntu/.bun/bin/bun"
-          export PATH="/home/ubuntu/.bun/bin:$PATH"
+          export PATH="$HOME/.bun/bin:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -1)/bin:$PATH"
 
           # Install bun if not available
-          if [ ! -f "$BUN_PATH" ]; then
-            echo "Installing bun..."
-            wget -qO- https://bun.sh/install | bash
+          if ! command -v bun &> /dev/null; then
+            curl -fsSL https://bun.sh/install | bash
+            export PATH="$HOME/.bun/bin:$PATH"
           fi
 
           # Install pm2 globally if not available
           if ! command -v pm2 &> /dev/null; then
-            $BUN_PATH install -g pm2
+            bun install -g pm2
           fi
 
           cd /home/ubuntu/admin-app
-          $BUN_PATH install
-          $BUN_PATH run build
+          bun install
+          bun run build
         EOF
 
     - name: Deploy with PM2 on EC2
@@ -76,7 +74,7 @@ jobs:
 
           cd /home/ubuntu/admin-app
           pm2 delete admin-app || true
-          PORT=3001 pm2 start /home/ubuntu/.bun/bin/bun --name admin-app -- run start
+          PORT=3001 pm2 start "bun run start" --name admin-app
           pm2 save
           pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
         EOF
