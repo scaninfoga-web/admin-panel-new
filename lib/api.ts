@@ -5,7 +5,7 @@ import { store } from '@/redux/store';
 
 // Function to dynamically get base URL from localStorage
 const getBaseUrl = () => {
-  return process.env.NEXT_PUBLIC_BACKEND_URL;
+  return process.env.NEXT_PUBLIC_BACKEND_URL || 'https://backend.scaninfoga.com';
 };
 
 const axiosInstance = axios.create({
