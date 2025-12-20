@@ -5,7 +5,6 @@ import { store } from '@/redux/store';
 
 // Function to dynamically get base URL from localStorage
 const getBaseUrl = () => {
-  // return 'http://localhost:8000'
   return process.env.NEXT_PUBLIC_BACKEND_URL;
 };
 
@@ -65,7 +64,7 @@ export const apiCall = async <T = any>(
 
     if (
       payload !== null &&
-      ['post', 'put', 'patch'].includes(method.toLowerCase())
+      ['post', 'put', 'patch', 'delete'].includes(method.toLowerCase())
     ) {
       config.data = payload;
     }
@@ -95,7 +94,32 @@ export const put = <T = any>(endpoint: string, data = null, config = {}) =>
 export const patch = <T = any>(endpoint: string, data = null, config = {}) =>
   apiCall<T>('patch', endpoint, data, config);
 
-export const del = <T = any>(endpoint: string, config = {}) =>
-  apiCall<T>('delete', endpoint, null, config);
+export const del = <T = any>(endpoint: string, data = {}, config = {}) =>
+  apiCall<T>('delete', endpoint, data, config);
+
+// File upload with progress tracking
+export const postWithProgress = async <T = any>(
+  endpoint: string,
+  data: FormData,
+  onProgress?: (percent: number) => void
+): Promise<T> => {
+  const token = getAuthToken();
+
+  const response = await axiosInstance.post(endpoint, data, {
+    baseURL: getBaseUrl(),
+    headers: {
+      'Content-Type': 'multipart/form-data',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    onUploadProgress: (progressEvent) => {
+      if (progressEvent.total && onProgress) {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percent);
+      }
+    },
+  });
+
+  return response.data;
+};
 
 export default axiosInstance;

@@ -4,8 +4,6 @@ import { deleteCookie, getCookie, setCookie } from 'cookies-next';
 const accessToken = getCookie('accessToken');
 const userCookie = getCookie('user');
 
-console.log("ACCESS TOKEN: ", accessToken, typeof accessToken);
-
 const initialState = {
   token: typeof accessToken === 'string' ? JSON.parse(accessToken) : null,
   user: typeof userCookie === 'string' ? JSON.parse(userCookie) : null,
