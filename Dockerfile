@@ -31,9 +31,9 @@ RUN chown -R nextjs:nodejs /app
 
 USER nextjs
 
-EXPOSE 3001
+EXPOSE 3005
 
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=3005
 
 CMD ["bun", "run", "start"]

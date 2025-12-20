@@ -65,7 +65,7 @@ jobs:
           docker run -d \
             --name admin-app \
             --restart unless-stopped \
-            -p 3001:3001 \
+            -p 3005:3005 \
             --env-file .env \
             admin-app:latest
 
