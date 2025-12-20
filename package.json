@@ -4,8 +4,7 @@
   "type": "module",
   "private": true,
   "devDependencies": {
-    "@types/bun": "latest",
-    "@types/node": "24.6.2",
+    "@types/node": "^20.0.0",
     "@types/react": "^19.1.8",
     "autoprefixer": "^10.4.21",
     "caniuse-lite": "^1.0.30001761",

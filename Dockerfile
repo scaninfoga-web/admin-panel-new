@@ -1,24 +1,30 @@
 # Build stage
-FROM oven/bun:1 AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json bun.lock* ./
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
 
-RUN bun install --frozen-lockfile
+COPY package.json pnpm-lock.yaml* ./
+
+RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-RUN bun run build
+RUN pnpm run build
 
 # Production stage
-FROM oven/bun:1-slim AS runner
+FROM node:20-alpine AS runner
 
 WORKDIR /app
 
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Create non-root user
-RUN groupadd --system --gid 1001 nodejs && \
-    useradd --system --uid 1001 --gid nodejs --shell /bin/false nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 --ingroup nodejs nextjs
 
 # Copy necessary files
 COPY --from=builder /app/package.json ./
@@ -36,4 +42,4 @@ EXPOSE 3005
 ENV NODE_ENV=production
 ENV PORT=3005
 
-CMD ["bun", "run", "start"]
+CMD ["pnpm", "run", "start"]
