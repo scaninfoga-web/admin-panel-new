@@ -11,7 +11,6 @@ export async function GET() {
     const data = response.data;
     return NextResponse.json(data);
   } catch (err) {
-    console.error('Proxy to ipapi.co failed:', err);
     return NextResponse.json({ error: 'Failed to fetch IP info' }, { status: 500 });
   }
 }
