@@ -188,7 +188,7 @@ export default function ExcelDataS3() {
   };
 
   return (
-    <Card className="max-w-md">
+    <Card className="w-[300px] lg:w-[400px]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="h-5 w-5" />
