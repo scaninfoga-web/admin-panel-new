@@ -53,7 +53,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         {...props}
       >
-        <span className={loading ? "invisible" : "visible"}>{children}</span>
+        <span className={cn("inline-flex items-center justify-center gap-2", loading ? "invisible" : "visible")}>{children}</span>
         {loading && (
           <span className="absolute inset-0 flex items-center justify-center">
             <Loader2 className="h-4 w-4 animate-spin" />
