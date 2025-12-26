@@ -942,7 +942,7 @@ export default function BankPdfS3() {
 
       {/* Statements Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
@@ -969,7 +969,7 @@ export default function BankPdfS3() {
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
-                className="space-y-3 max-h-[55vh] overflow-y-auto pr-2 custom-scrollbar"
+                className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[65vh] overflow-y-auto pr-2 custom-scrollbar"
               >
                 <AnimatePresence mode="popLayout">
                   {statements.map((statement) => (
