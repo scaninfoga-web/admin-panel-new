@@ -406,7 +406,12 @@ export default function BankStatementList() {
       width: 60,
     },
     {
-      title: "Name",
+      title: "Requested User Email",
+      dataIndex: "request_user_email",
+      render: (val: string) => <span className="text-sm">{val}</span>,
+    },
+    {
+      title: "Account Holder Name",
       dataIndex: "name",
       render: (val: string) => <span className="font-medium">{val}</span>,
     },

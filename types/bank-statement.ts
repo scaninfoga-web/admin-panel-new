@@ -22,6 +22,7 @@ export interface BankStatement {
   status: StatementStatus;
   created_at: string;
   updated_at: string;
+  request_user_email: string;
   status_history: StatusHistoryItem[];
 }
 
