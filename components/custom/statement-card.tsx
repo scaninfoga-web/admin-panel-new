@@ -17,7 +17,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { cn, formatDate } from "@/lib/utils";
 import type { BankStatement, StatementStatus, StatusConfig } from "@/types/bank-statement";
 
 // Status configuration
@@ -48,16 +48,7 @@ const STATUS_CONFIGS: Record<StatementStatus, StatusConfig> = {
   },
 };
 
-// Format date utility
-const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+
 
 // Animation variants
 const itemVariants = {

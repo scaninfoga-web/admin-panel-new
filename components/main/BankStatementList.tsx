@@ -400,20 +400,20 @@ export default function BankStatementList() {
 
   // Table columns
   const columns: Column<BankStatement>[] = [
-    {
-      title: "ID",
-      dataIndex: "id",
-      width: 60,
-    },
+    // {
+    //   title: "ID",
+    //   dataIndex: "id",
+    //   width: 60,
+    // },
     {
       title: "Requested User Email",
       dataIndex: "request_user_email",
-      render: (val: string) => <span className="text-sm">{val}</span>,
+      render: (val: string) => <span className="text-medium">{val}</span>,
     },
     {
-      title: "Account Holder Name",
+      title: "Acc Holder Name",
       dataIndex: "name",
-      render: (val: string) => <span className="font-medium">{val}</span>,
+      render: (val: string) => <span className="font-sm">{val}</span>,
     },
     {
       title: "Mobile",

@@ -32,17 +32,53 @@ export function isValidIndianMobileNumber(input: string): {
 }
 
 
-export const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return new Intl.DateTimeFormat('en-US', {
+export function formatDate(input: string | undefined | null): string {
+  if (!input) {
+    return '----';
+  }
+
+  let normalizedString = input.trim();
+
+  // Handle various timestamp formats:
+  // 1. "2025-12-26T14:00:32.192914" (no timezone - treat as UTC)
+  // 2. "2024-03-31+05:30" (date with timezone offset)
+  // 3. "2024-03-31T00:00:00+05:30" (full ISO with timezone)
+  // 4. "2024-03-31T00:00:00Z" (UTC)
+  // 5. "2024-03-31T00:00:00" (no timezone)
+
+  // Handle date-only format with timezone offset: "2024-03-31+05:30"
+  if (/^\d{4}-\d{2}-\d{2}[+-]\d{2}:\d{2}$/.test(normalizedString)) {
+    normalizedString = normalizedString.replace(
+      /^(\d{4}-\d{2}-\d{2})([+-]\d{2}:\d{2})$/,
+      '$1T00:00:00$2',
+    );
+  }
+
+  // Handle timestamp without timezone (treat as UTC): "2025-12-26T14:00:32.192914"
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(normalizedString)) {
+    normalizedString = normalizedString + 'Z';
+  }
+
+  const date = new Date(normalizedString);
+
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    return input;
+  }
+
+  // Always format in Indian Standard Time (IST)
+  const options: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
     hour12: true,
-  }).format(date);
-};
+    timeZone: 'Asia/Kolkata',
+  };
+
+  return date.toLocaleString('en-IN', options);
+}
 
 
 export const formatISOtoDDMMYYYY = (isoString: string | null): string => {
