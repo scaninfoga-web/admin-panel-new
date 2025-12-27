@@ -43,7 +43,7 @@ const formatFileSize = (bytes: number): string => {
 };
 
 
-export default function ExcelDataS3() {
+export default function CDRExcelData() {
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [uploading, setUploading] = useState<boolean>(false);

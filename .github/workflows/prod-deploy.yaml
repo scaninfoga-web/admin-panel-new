@@ -49,6 +49,7 @@ jobs:
     - name: Build and Deploy with Docker on EC2
       run: |
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+        
           cd /home/ubuntu/admin-app
 
           # Build new Docker image (keep old image for cache)

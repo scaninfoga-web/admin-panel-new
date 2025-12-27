@@ -2,14 +2,15 @@
 
 import CustomTabs from '@/components/custom/custom-tab';
 import BankStatementList from '@/components/main/BankStatementPdf/BankStatementList';
-import ExcelDataS3 from '@/components/main/ExcelDataS3';
+import CdrExcelDataList from '@/components/main/CdrExcelData/CdrExcelDataList';
 
 export default function S3Page() {
+
   const tabs = [
     {
       value: 'cdrexceldata',
       label: 'CDR Excel Data',
-      component: <ExcelDataS3 />,
+      component: <CdrExcelDataList />,
     },
     {
       value: 'pdf',
