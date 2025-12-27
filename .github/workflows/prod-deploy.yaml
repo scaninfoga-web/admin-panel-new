@@ -9,65 +9,71 @@ jobs:
   deploy:
     name: Deploy on EC2
     runs-on: ubuntu-latest
-    concurrency:
-      group: deploy-prod
-      cancel-in-progress: true
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Copy source & Deploy
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: ".,!.git,!node_modules,!.next,!dist"
-          target: /home/ubuntu/admin-app
-          strip_components: 0
-          overwrite: true
+    - name: Setup SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.EC2_SSH_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Build and Run
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 15m
-          script: |
-            cd /home/ubuntu/admin-app
 
-            # Create .env
-            cat <<EOT > .env
-            PORT=3001
-            NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
-            EOT
+    - name: Create app directory on EC2
+      run: |
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} "mkdir -p /home/ubuntu/admin-app"
 
-            # Enable BuildKit for faster builds with caching
-            export DOCKER_BUILDKIT=1
+    - name: Copy source code to EC2
+      run: |
+        rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" \
+          --exclude='.git' \
+          --exclude='node_modules' \
+          --exclude='.next' \
+          --exclude='dist' \
+          ./ \
+          ubuntu@${{ secrets.EC2_HOST }}:/home/ubuntu/admin-app/
 
-            # Build new image (keep old image for cache layers - don't delete before build!)
-            docker build --build-arg BUILDKIT_INLINE_CACHE=1 -t admin-app:new .
+    - name: Create .env file on EC2
+      run: |
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+        cat <<EOT > /home/ubuntu/admin-app/.env
+        PORT=3001
+        NEXT_PUBLIC_BACKEND_URL=${{ secrets.NEXT_PUBLIC_BACKEND_URL }}
+        EOT
+        EOF
 
-            # Stop and remove old container
-            docker stop admin-app 2>/dev/null || true
-            docker rm admin-app 2>/dev/null || true
 
-            # Swap images
-            docker rmi admin-app:old 2>/dev/null || true
-            docker tag admin-app:latest admin-app:old 2>/dev/null || true
-            docker tag admin-app:new admin-app:latest
-            docker rmi admin-app:new 2>/dev/null || true
+    - name: Build and Deploy with Docker on EC2
+      run: |
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+          cd /home/ubuntu/admin-app
 
-            # Run new container
-            docker run -d \
-              --name admin-app \
-              --restart unless-stopped \
-              -p 3005:3005 \
-              --env-file .env \
-              admin-app:latest
+          # Build new Docker image (keep old image for cache)
+          docker build -t admin-app:new .
 
-            # Cleanup
-            docker image prune -f
+          # Stop and remove existing container
+          docker stop admin-app 2>/dev/null || true
+          docker rm admin-app 2>/dev/null || true
+
+          # Remove old image after build
+          docker rmi admin-app:latest 2>/dev/null || true
+
+          # Tag new image as latest
+          docker tag admin-app:new admin-app:latest
+          docker rmi admin-app:new 2>/dev/null || true
+
+          # Run the container
+          docker run -d \
+            --name admin-app \
+            --restart unless-stopped \
+            -p 3005:3005 \
+            --env-file .env \
+            admin-app:latest
+
+          # Prune unused images to save disk space
+          docker image prune -f
+        EOF
         

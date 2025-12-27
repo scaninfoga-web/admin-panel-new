@@ -814,7 +814,7 @@ export default function BankStatementList() {
 
       {/* Table */}
       <Card className="overflow-hidden">
-        <div className="overflow-auto custom-scrollbar max-h-[600px]">
+        <div className="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[600px]">
           <CustomTable
             columns={columns}
             dataSource={statements}
