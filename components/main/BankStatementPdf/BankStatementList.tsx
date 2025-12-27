@@ -40,7 +40,7 @@ import { toast } from "sonner";
 import { CustomTable, type Column } from "@/components/custom/custom-table";
 import Pagination from "@/components/custom/pagination";
 import { BankStatementFilter } from "@/components/custom/bank-statement-filter";
-import BankStatementNewRecord from "@/components/main/BankStatementNewRecord";
+import BankStatementNewRecord from "@/components/main/BankStatementPdf/BankStatementNewRecord";
 import type {
   BankStatement,
   BankStatementsResponse,
@@ -50,6 +50,7 @@ import type {
   StatusHistoryItem,
 } from "@/types/bank-statement";
 import { motion, AnimatePresence } from "framer-motion";
+import { getSignedUrlS3 } from "@/actions/s3-related";
 
 // Upload response type
 interface UploadResponse {
@@ -191,6 +192,58 @@ export default function BankStatementList() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+
+  // Signed URL loading state
+  const [signedUrlLoading, setSignedUrlLoading] = useState<number | null>(null);
+
+  // Handle opening PDF for success statements
+  const handleOpenPdf = async (statement: BankStatement) => {
+    if (statement.status !== "success" || !statement.s3_key) return;
+
+    setSignedUrlLoading(statement.id);
+    const toastId = toast.loading("Fetching PDF...");
+
+    try {
+      const signedUrl = await getSignedUrlS3(statement.s3_key);
+      if (signedUrl) {
+        toast.success("Opening PDF...", { id: toastId, duration: 300 });
+        window.open(signedUrl, "_blank");
+      } else {
+        toast.error("Failed to get signed URL", { id: toastId, duration: 300 });
+      }
+    } catch {
+      toast.error("Failed to fetch PDF", { id: toastId, duration: 300 });
+    } finally {
+      setSignedUrlLoading(null);
+    }
+  };
+
+  // Clickable cell wrapper for success statements
+  const ClickableCell = ({
+    children,
+    record
+  }: {
+    children: React.ReactNode;
+    record: BankStatement;
+  }) => {
+    const isClickable = record.status === "success" && record.s3_key;
+
+    if (!isClickable) {
+      return <>{children}</>;
+    }
+
+    return (
+      <span
+        onClick={() => handleOpenPdf(record)}
+        className={cn(
+          "hover:underline hover:text-primary cursor-pointer transition-all",
+          signedUrlLoading === record.id && "opacity-50 pointer-events-none"
+        )}
+      >
+        {children}
+      </span>
+    );
+  };
 
   // View History handler
   const handleViewHistory = (statement: BankStatement) => {
@@ -408,37 +461,65 @@ export default function BankStatementList() {
     {
       title: "Requested User Email",
       dataIndex: "request_user_email",
-      render: (val: string) => <span className="text-medium">{val}</span>,
+      render: (val: string, record: BankStatement) => (
+        <ClickableCell record={record}>
+          <span className="text-medium">{val}</span>
+        </ClickableCell>
+      ),
     },
     {
       title: "Acc Holder Name",
       dataIndex: "name",
-      render: (val: string) => <span className="font-sm">{val}</span>,
+      render: (val: string, record: BankStatement) => (
+        <ClickableCell record={record}>
+          <span className="font-sm">{val}</span>
+        </ClickableCell>
+      ),
     },
     {
       title: "Mobile",
       dataIndex: "mobile_number",
-      render: (val: string) => <span className="font-mono text-sm">{val}</span>,
+      render: (val: string, record: BankStatement) => (
+        <ClickableCell record={record}>
+          <span className="font-mono text-sm">{val}</span>
+        </ClickableCell>
+      ),
     },
     {
       title: "Account No.",
       dataIndex: "account_number",
-      render: (val: string) => <span className="font-mono text-sm">{val}</span>,
+      render: (val: string, record: BankStatement) => (
+        <ClickableCell record={record}>
+          <span className="font-mono text-sm">{val}</span>
+        </ClickableCell>
+      ),
     },
     {
       title: "Bank",
       dataIndex: "bank_name",
+      render: (val: string, record: BankStatement) => (
+        <ClickableCell record={record}>
+          <span>{val}</span>
+        </ClickableCell>
+      ),
     },
     {
       title: "IFSC",
       dataIndex: "ifsc_code",
-      render: (val: string) => (
-        <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{val}</span>
+      render: (val: string, record: BankStatement) => (
+        <ClickableCell record={record}>
+          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{val}</span>
+        </ClickableCell>
       ),
     },
     {
       title: "Investigator",
       dataIndex: "investigator_officier_name",
+      render: (val: string, record: BankStatement) => (
+        <ClickableCell record={record}>
+          <span>{val}</span>
+        </ClickableCell>
+      ),
     },
     {
       title: "History",
@@ -504,6 +585,15 @@ export default function BankStatementList() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => handleReject(record)}
+                className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                <X className="h-4 w-4" />
+                Reject
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => handleDelete(record)}
                 className="gap-1 text-destructive hover:bg-destructive/10"
               >
@@ -520,11 +610,19 @@ export default function BankStatementList() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => handleReject(record)}
+                className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                <X className="h-4 w-4" />
+                Reject
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => handleDelete(record)}
                 className="gap-1 text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
               </Button>
             </>
           )}
@@ -537,11 +635,19 @@ export default function BankStatementList() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => handleApprove(record)}
+                className="gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+              >
+                <Check className="h-4 w-4" />
+                Approve
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => handleDelete(record)}
                 className="gap-1 text-destructive hover:bg-destructive/10"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete
               </Button>
             </>
           )}

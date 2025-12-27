@@ -83,7 +83,7 @@ const Navbar: React.FC = () => {
       <div className="w-full flex items-center justify-between">
         <div className="mb-2">
           <Image
-            src="https://d29bvka1s4r8lj.cloudfront.net/upper_logo.png"
+            src="https://d29bvka1s4r8lj.cloudfront.net/scaninfoga_stuff/upper_logo.png"
             alt="scaninfoga"
             width={200}
             height={0}

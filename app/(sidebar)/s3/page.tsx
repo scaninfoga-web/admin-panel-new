@@ -1,14 +1,14 @@
 'use client';
 
 import CustomTabs from '@/components/custom/custom-tab';
+import BankStatementList from '@/components/main/BankStatementPdf/BankStatementList';
 import ExcelDataS3 from '@/components/main/ExcelDataS3';
-import BankStatementList from '@/components/main/BankStatementList';
 
 export default function S3Page() {
   const tabs = [
     {
-      value: 'excel',
-      label: 'Excel',
+      value: 'cdrexceldata',
+      label: 'CDR Excel Data',
       component: <ExcelDataS3 />,
     },
     {
@@ -20,7 +20,7 @@ export default function S3Page() {
 
   return (
     <div className="p-6">
-      <CustomTabs tabs={tabs} defaultValue="excel" />
+      <CustomTabs tabs={tabs} defaultValue="cdrexceldata" />
     </div>
   );
 }
