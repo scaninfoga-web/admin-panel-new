@@ -344,7 +344,7 @@ export default function BankStatementList() {
     setConfirmDialogOpen(true);
   };
 
-  // Grant Files handlers for approved requests
+  // Grant Files handlers for approved/success requests
   const handleOpenGrantFilesDialog = (request: BankStatementAccessRequest) => {
     // Find files for this account
     const statement = statementData.find(d =>
@@ -360,8 +360,16 @@ export default function BankStatementList() {
 
     setGrantRequest(request);
     setAvailableFiles(files);
-    setSelectedFileIds([]);
-    setGrantAllFiles(false);
+
+    // Pre-select currently accessible files if status is success
+    if (request.status === "success" && request.accessible_file_ids.length > 0) {
+      setSelectedFileIds(request.accessible_file_ids);
+      setGrantAllFiles(request.accessible_file_ids.length === files.length);
+    } else {
+      setSelectedFileIds([]);
+      setGrantAllFiles(false);
+    }
+
     setGrantFilesDialogOpen(true);
   };
 
@@ -747,6 +755,15 @@ export default function BankStatementList() {
                 <CheckCircle className="h-3 w-3" />
                 Success
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenGrantFilesDialog(record)}
+                className="gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Modify Access
+              </Button>
               <Button
                 variant="outline"
                 size="sm"

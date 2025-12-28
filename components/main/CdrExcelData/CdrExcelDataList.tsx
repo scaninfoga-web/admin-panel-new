@@ -191,7 +191,7 @@ export default function CdrExcelDataList() {
   const [grantLoading, setGrantLoading] = useState(false);
 
   // Form fields for upload
-  const [holderName, setHolderName] = useState("");
+  const [requestedNumber, setRequestedNumber] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -219,7 +219,7 @@ export default function CdrExcelDataList() {
 
     // Get the first accessible file's s3_key from cdrData
     const fileId = request.accessible_file_ids[0];
-    const cdrRecord = cdrData.find(d => d.mobile_number === request.mobile_number);
+    const cdrRecord = cdrData.find(d => d.requested_number === request.requested_number);
     const fileObj = cdrRecord?.files.find(f => f.id === fileId);
 
     if (!fileObj?.s3_key) return;
@@ -342,10 +342,10 @@ export default function CdrExcelDataList() {
     setConfirmDialogOpen(true);
   };
 
-  // Grant Files handlers for approved requests
+  // Grant Files handlers for approved/success requests
   const handleOpenGrantFilesDialog = (request: CdrAccessRequest) => {
     // Find files for this mobile number
-    const cdrRecord = cdrData.find(d => d.mobile_number === request.mobile_number);
+    const cdrRecord = cdrData.find(d => d.requested_number === request.requested_number);
     const files = cdrRecord?.files || [];
 
     if (files.length === 0) {
@@ -356,8 +356,16 @@ export default function CdrExcelDataList() {
 
     setGrantRequest(request);
     setAvailableFiles(files);
-    setSelectedFileIds([]);
-    setGrantAllFiles(false);
+
+    // Pre-select currently accessible files if status is success
+    if (request.status === "success" && request.accessible_file_ids.length > 0) {
+      setSelectedFileIds(request.accessible_file_ids);
+      setGrantAllFiles(request.accessible_file_ids.length === files.length);
+    } else {
+      setSelectedFileIds([]);
+      setGrantAllFiles(false);
+    }
+
     setGrantFilesDialogOpen(true);
   };
 
@@ -417,7 +425,7 @@ export default function CdrExcelDataList() {
   // Upload handlers for approved requests (new file upload)
   const handleOpenUploadDialog = (request: CdrAccessRequest) => {
     setUploadRequest(request);
-    setHolderName(request.holder_name);
+    setRequestedNumber(request.requested_number);
     setUploadDialogOpen(true);
   };
 
@@ -478,8 +486,8 @@ export default function CdrExcelDataList() {
       return;
     }
 
-    if (!holderName.trim()) {
-      setUploadError("Holder name is required.");
+    if (!requestedNumber.trim()) {
+      setUploadError("Requested number is required.");
       return;
     }
 
@@ -494,8 +502,8 @@ export default function CdrExcelDataList() {
       const uploadRes = await post("/api/mobile/set-cdr-excel-data", {
         request_type: "upload",
         s3_key: uploadedFile.s3_key,
-        mobile_number: uploadRequest.mobile_number,
-        holder_name: holderName.trim(),
+        searched_number: uploadRequest.searched_number,
+        requested_number: requestedNumber.trim(),
         from_date: fromDate,
         to_date: toDate,
       });
@@ -557,7 +565,7 @@ export default function CdrExcelDataList() {
     setProgress(0);
     setUploadedFile(null);
     setUploadError("");
-    setHolderName("");
+    setRequestedNumber("");
     setFromDate("");
     setToDate("");
     if (fileInputRef.current) {
@@ -577,17 +585,17 @@ export default function CdrExcelDataList() {
       ),
     },
     {
-      title: "Holder Name",
-      dataIndex: "holder_name",
+      title: "Searched Number",
+      dataIndex: "searched_number",
       render: (val: string, record: CdrAccessRequest) => (
         <ClickableCell record={record}>
-          <span className="font-sm">{val}</span>
+          <span className="font-mono text-sm">{val}</span>
         </ClickableCell>
       ),
     },
     {
-      title: "Mobile",
-      dataIndex: "mobile_number",
+      title: "Requested Number",
+      dataIndex: "requested_number",
       render: (val: string, record: CdrAccessRequest) => (
         <ClickableCell record={record}>
           <span className="font-mono text-sm">{val}</span>
@@ -607,7 +615,7 @@ export default function CdrExcelDataList() {
       title: "Files Access",
       dataIndex: "accessible_file_ids",
       render: (val: number[], record: CdrAccessRequest) => {
-        const cdrRecord = cdrData.find(d => d.mobile_number === record.mobile_number);
+        const cdrRecord = cdrData.find(d => d.requested_number === record.requested_number);
         const totalFiles = cdrRecord?.total_files || 0;
         return (
           <span className="text-sm">
@@ -702,6 +710,15 @@ export default function CdrExcelDataList() {
                 <CheckCircle className="h-3 w-3" />
                 Success
               </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleOpenGrantFilesDialog(record)}
+                className="gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Modify Access
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -943,9 +960,9 @@ export default function CdrExcelDataList() {
             {selectedRequest && (
               <DialogDescription className="flex flex-col gap-1">
                 <span>
-                  <span className="font-medium text-foreground">{selectedRequest.holder_name}</span>
+                  <span className="font-medium text-foreground">{selectedRequest.requested_number}</span>
                   {" - "}
-                  {selectedRequest.mobile_number}
+                  {selectedRequest.searched_number}
                 </span>
                 <span className="text-xs">
                   Investigator: {selectedRequest.investigator_officier_name}
@@ -1028,10 +1045,10 @@ export default function CdrExcelDataList() {
                                   <span className="font-medium">Reason:</span> {String(history.details.reason)}
                                 </div>
                               )}
-                              {history.details.holder_name && (
+                              {history.details.requested_number && (
                                 <div>
-                                  <span className="font-medium text-muted-foreground">Holder:</span>{" "}
-                                  {String(history.details.holder_name)}
+                                  <span className="font-medium text-muted-foreground">Requested Number:</span>{" "}
+                                  {String(history.details.requested_number)}
                                 </div>
                               )}
                               {history.details.investigator_officier_name && (
@@ -1098,9 +1115,9 @@ export default function CdrExcelDataList() {
             {grantRequest && (
               <DialogDescription className="flex flex-col gap-1">
                 <span>
-                  <span className="font-medium text-foreground">{grantRequest.holder_name}</span>
+                  <span className="font-medium text-foreground">{grantRequest.requested_number}</span>
                   {" - "}
-                  {grantRequest.mobile_number}
+                  {grantRequest.searched_number}
                 </span>
                 <span className="text-xs">
                   Select files to grant access to user: {grantRequest.request_user_email}
@@ -1195,9 +1212,9 @@ export default function CdrExcelDataList() {
             {uploadRequest && (
               <DialogDescription className="flex flex-col gap-1">
                 <span>
-                  <span className="font-medium text-foreground">{uploadRequest.holder_name}</span>
+                  <span className="font-medium text-foreground">{uploadRequest.requested_number}</span>
                   {" - "}
-                  {uploadRequest.mobile_number}
+                  {uploadRequest.searched_number}
                 </span>
                 <span className="text-xs">
                   Requested by: {uploadRequest.request_user_email}
@@ -1245,12 +1262,12 @@ export default function CdrExcelDataList() {
                 {/* Form Fields */}
                 <div className="space-y-3">
                   <div className="space-y-2">
-                    <Label htmlFor="holderName">Holder Name <span className="text-destructive">*</span></Label>
+                    <Label htmlFor="requestedNumber">Requested Number <span className="text-destructive">*</span></Label>
                     <Input
-                      id="holderName"
-                      placeholder="Enter holder name"
-                      value={holderName}
-                      onChange={(e) => setHolderName(e.target.value)}
+                      id="requestedNumber"
+                      placeholder="Enter requested number"
+                      value={requestedNumber}
+                      onChange={(e) => setRequestedNumber(e.target.value)}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -1459,10 +1476,10 @@ export default function CdrExcelDataList() {
               className="p-4 bg-secondary/30 rounded-lg space-y-2"
             >
               <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium">{actionRequest.holder_name}</span>
+                <span className="font-medium">Requested: {actionRequest.requested_number}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{actionRequest.mobile_number}</span>
+                <span>Searched: {actionRequest.searched_number}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Investigator: {actionRequest.investigator_officier_name}</span>

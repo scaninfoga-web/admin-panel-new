@@ -14,11 +14,11 @@ export interface CdrFile {
   updated_at: string;
 }
 
-// CDR data record (holder with files)
+// CDR data record (with files)
 export interface CdrDataRecord {
   id: number;
-  holder_name: string;
-  mobile_number: string;
+  searched_number: string;
+  requested_number: string;
   files: CdrFile[];
   total_files: number;
   created_at: string;
@@ -28,7 +28,8 @@ export interface CdrDataRecord {
 // Status history details for access requests
 export interface StatusHistoryDetails {
   reason?: string;
-  holder_name?: string;
+  requested_number?: string;
+  searched_number?: string;
   investigator_officier_name?: string;
   previous_status?: string;
   grant_all?: boolean;
@@ -47,8 +48,8 @@ export interface StatusHistoryItem {
 // Access request record
 export interface CdrAccessRequest {
   id: number;
-  mobile_number: string;
-  holder_name: string;
+  searched_number: string;
+  requested_number: string;
   investigator_officier_name: string;
   request_user_email: string;
   status: CdrStatus;
