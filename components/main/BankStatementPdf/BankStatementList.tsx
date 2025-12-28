@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,6 @@ import { Label } from "@/components/ui/label";
 import {
   RefreshCw,
   FileText,
-  Plus,
   Clock,
   BadgeCheck,
   XCircle,
@@ -39,10 +39,11 @@ import { cn, formatDate } from "@/lib/utils";
 import { toast } from "sonner";
 import { CustomTable, type Column } from "@/components/custom/custom-table";
 import Pagination from "@/components/custom/pagination";
-import { BankStatementFilter } from "@/components/custom/bank-statement-filter";
-import BankStatementNewRecord from "@/components/main/BankStatementPdf/BankStatementNewRecord";
+import { AccessRequestFilter } from "@/components/custom/access-request-filter";
 import type {
-  BankStatement,
+  BankStatementAccessRequest,
+  BankStatementData,
+  BankStatementFile,
   BankStatementsResponse,
   BankStatementFilterState,
   PaginationInfo,
@@ -92,6 +93,11 @@ type StatusConfigType = {
 
 const STATUS_CONFIGS: Record<string, StatusConfigType> = {
   requested: {
+    icon: Package,
+    color: "text-blue-500",
+    bgColor: "bg-blue-500",
+  },
+  re_requested: {
     icon: Package,
     color: "text-blue-500",
     bgColor: "bg-blue-500",
@@ -153,22 +159,20 @@ const getStatusBadge = (status: StatementStatus) => {
 
 export default function BankStatementList() {
   // Data state
-  const [statements, setStatements] = useState<BankStatement[]>([]);
+  const [accessRequests, setAccessRequests] = useState<BankStatementAccessRequest[]>([]);
+  const [statementData, setStatementData] = useState<BankStatementData[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
 
   // Loading state
   const [loading, setLoading] = useState(false);
 
-  // New Record Dialog state
-  const [newRecordOpen, setNewRecordOpen] = useState(false);
-
   // History Dialog state
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
-  const [selectedStatement, setSelectedStatement] = useState<BankStatement | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<BankStatementAccessRequest | null>(null);
 
-  // Upload Dialog state (for approved statements)
+  // Upload Dialog state (for uploading new files)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [uploadStatement, setUploadStatement] = useState<BankStatement | null>(null);
+  const [uploadRequest, setUploadRequest] = useState<BankStatementAccessRequest | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [uploading, setUploading] = useState<boolean>(false);
@@ -178,10 +182,26 @@ export default function BankStatementList() {
   const [uploadError, setUploadError] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Grant Files Dialog state (for approved requests with existing files)
+  const [grantFilesDialogOpen, setGrantFilesDialogOpen] = useState(false);
+  const [grantRequest, setGrantRequest] = useState<BankStatementAccessRequest | null>(null);
+  const [availableFiles, setAvailableFiles] = useState<BankStatementFile[]>([]);
+  const [selectedFileIds, setSelectedFileIds] = useState<number[]>([]);
+  const [grantAllFiles, setGrantAllFiles] = useState(false);
+  const [grantLoading, setGrantLoading] = useState(false);
+
+  // Form fields for upload
+  const [accountHolderName, setAccountHolderName] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [ifscCode, setIfscCode] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+
   // Confirm Dialog state (for approve/reject/delete actions)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | "delete" | null>(null);
-  const [actionStatement, setActionStatement] = useState<BankStatement | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"approve" | "reject" | "delete_request" | null>(null);
+  const [actionRequest, setActionRequest] = useState<BankStatementAccessRequest | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
@@ -196,15 +216,24 @@ export default function BankStatementList() {
   // Signed URL loading state
   const [signedUrlLoading, setSignedUrlLoading] = useState<number | null>(null);
 
-  // Handle opening PDF for success statements
-  const handleOpenPdf = async (statement: BankStatement) => {
-    if (statement.status !== "success" || !statement.s3_key) return;
+  // Handle opening file for success requests
+  const handleOpenFile = async (request: BankStatementAccessRequest) => {
+    if (request.status !== "success" || request.accessible_file_ids.length === 0) return;
 
-    setSignedUrlLoading(statement.id);
+    // Get the first accessible file's s3_key from statementData
+    const fileId = request.accessible_file_ids[0];
+    const statement = statementData.find(d =>
+      d.mobile_number === request.mobile_number && d.account_number === request.account_number
+    );
+    const fileObj = statement?.files.find(f => f.id === fileId);
+
+    if (!fileObj?.s3_key) return;
+
+    setSignedUrlLoading(request.id);
     const toastId = toast.loading("Fetching PDF...");
 
     try {
-      const signedUrl = await getSignedUrlS3(statement.s3_key);
+      const signedUrl = await getSignedUrlS3(fileObj.s3_key);
       if (signedUrl) {
         toast.success("Opening PDF...", { id: toastId, duration: 300 });
         window.open(signedUrl, "_blank");
@@ -218,15 +247,15 @@ export default function BankStatementList() {
     }
   };
 
-  // Clickable cell wrapper for success statements
+  // Clickable cell wrapper for success requests
   const ClickableCell = ({
     children,
     record
   }: {
     children: React.ReactNode;
-    record: BankStatement;
+    record: BankStatementAccessRequest;
   }) => {
-    const isClickable = record.status === "success" && record.s3_key;
+    const isClickable = record.status === "success" && record.accessible_file_ids.length > 0;
 
     if (!isClickable) {
       return <>{children}</>;
@@ -234,7 +263,7 @@ export default function BankStatementList() {
 
     return (
       <span
-        onClick={() => handleOpenPdf(record)}
+        onClick={() => handleOpenFile(record)}
         className={cn(
           "hover:underline hover:text-primary cursor-pointer transition-all",
           signedUrlLoading === record.id && "opacity-50 pointer-events-none"
@@ -246,94 +275,156 @@ export default function BankStatementList() {
   };
 
   // View History handler
-  const handleViewHistory = (statement: BankStatement) => {
-    setSelectedStatement(statement);
+  const handleViewHistory = (request: BankStatementAccessRequest) => {
+    setSelectedRequest(request);
     setHistoryDialogOpen(true);
   };
 
   const executeAction = async () => {
-    if (!actionStatement || !confirmAction) return;
+    if (!actionRequest || !confirmAction) return;
 
     setActionLoading(true);
     try {
-      let endpoint = "";
-      let payload: Record<string, unknown> = { id: actionStatement.id };
+      const payload: Record<string, unknown> = {};
 
       switch (confirmAction) {
         case "approve":
-          endpoint = "/api/mobile/set-pdf-bank-statement";
-          payload = { ...payload, request_type: "approve" };
+          payload.request_type = "approve";
+          payload.request_id = actionRequest.id;
           break;
         case "reject":
-          endpoint = "/api/mobile/set-pdf-bank-statement";
-          payload = {
-            ...payload,
-            request_type: "reject",
-            rejected_reason: rejectReason.trim(),
-          };
+          payload.request_type = "reject";
+          payload.request_id = actionRequest.id;
+          payload.rejected_reason = rejectReason.trim();
           break;
-        case "delete":
-          endpoint = "/api/upload/s3/delete";
-          payload = {
-            ...payload,
-            s3_key: actionStatement.s3_key,
-            request_type: "delete",
-          };
+        case "delete_request":
+          payload.request_type = "delete_request";
+          payload.request_id = actionRequest.id;
           break;
       }
 
-      let res = null;
-      if (confirmAction === "delete") {
-        if (payload.s3_key) {
-          res = await del(endpoint, payload);
-        }
-        endpoint = "/api/mobile/set-pdf-bank-statement";
-      }
-      res = await post(endpoint, payload);
+      const res = await post("/api/mobile/set-pdf-bank-statement", payload);
 
       toast.success(
-        res?.responseStatus?.message || `${confirmAction} successful`
+        res?.responseStatus?.message || `${confirmAction.replace("_", " ")} successful`
       );
 
       setConfirmDialogOpen(false);
-      setActionStatement(null);
+      setActionRequest(null);
       setConfirmAction(null);
       setRejectReason("");
-      fetchStatements();
+      fetchData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { responseStatus?: { message?: string } } } };
       const errMsg =
         err?.response?.data?.responseStatus?.message ||
-        `${confirmAction} failed`;
+        `${confirmAction.replace("_", " ")} failed`;
       toast.error(errMsg);
     } finally {
       setActionLoading(false);
     }
   };
 
-
   // Action handlers - open confirm dialog
-  const handleApprove = (statement: BankStatement) => {
-    setActionStatement(statement);
+  const handleApprove = (request: BankStatementAccessRequest) => {
+    setActionRequest(request);
     setConfirmAction("approve");
     setConfirmDialogOpen(true);
   };
 
-  const handleReject = (statement: BankStatement) => {
-    setActionStatement(statement);
+  const handleReject = (request: BankStatementAccessRequest) => {
+    setActionRequest(request);
     setConfirmAction("reject");
     setConfirmDialogOpen(true);
   };
 
-  const handleDelete = (statement: BankStatement) => {
-    setActionStatement(statement);
-    setConfirmAction("delete");
+  const handleDelete = (request: BankStatementAccessRequest) => {
+    setActionRequest(request);
+    setConfirmAction("delete_request");
     setConfirmDialogOpen(true);
   };
 
-  // Upload handlers for approved statements
-  const handleOpenUploadDialog = (statement: BankStatement) => {
-    setUploadStatement(statement);
+  // Grant Files handlers for approved requests
+  const handleOpenGrantFilesDialog = (request: BankStatementAccessRequest) => {
+    // Find files for this account
+    const statement = statementData.find(d =>
+      d.mobile_number === request.mobile_number && d.account_number === request.account_number
+    );
+    const files = statement?.files || [];
+
+    if (files.length === 0) {
+      // No existing files, open upload dialog instead
+      handleOpenUploadDialog(request);
+      return;
+    }
+
+    setGrantRequest(request);
+    setAvailableFiles(files);
+    setSelectedFileIds([]);
+    setGrantAllFiles(false);
+    setGrantFilesDialogOpen(true);
+  };
+
+  const handleToggleFile = (fileId: number) => {
+    setSelectedFileIds(prev =>
+      prev.includes(fileId)
+        ? prev.filter(id => id !== fileId)
+        : [...prev, fileId]
+    );
+  };
+
+  const handleToggleGrantAll = () => {
+    if (grantAllFiles) {
+      setGrantAllFiles(false);
+      setSelectedFileIds([]);
+    } else {
+      setGrantAllFiles(true);
+      setSelectedFileIds(availableFiles.map(f => f.id));
+    }
+  };
+
+  const handleGrantFiles = async () => {
+    if (!grantRequest || (selectedFileIds.length === 0 && !grantAllFiles)) {
+      toast.error("Please select at least one file to grant access");
+      return;
+    }
+
+    setGrantLoading(true);
+    try {
+      const res = await post("/api/mobile/set-pdf-bank-statement", {
+        request_type: "grant_access",
+        request_id: grantRequest.id,
+        grant_all: grantAllFiles,
+        file_ids: grantAllFiles ? availableFiles.map(f => f.id) : selectedFileIds,
+      });
+
+      toast.success(res?.responseStatus?.message || "Access granted successfully");
+      resetGrantFilesDialog();
+      fetchData();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { responseStatus?: { message?: string } } } };
+      const errMsg = err?.response?.data?.responseStatus?.message || "Failed to grant access";
+      toast.error(errMsg);
+    } finally {
+      setGrantLoading(false);
+    }
+  };
+
+  const resetGrantFilesDialog = () => {
+    setGrantFilesDialogOpen(false);
+    setGrantRequest(null);
+    setAvailableFiles([]);
+    setSelectedFileIds([]);
+    setGrantAllFiles(false);
+  };
+
+  // Upload handlers for new file upload
+  const handleOpenUploadDialog = (request: BankStatementAccessRequest) => {
+    setUploadRequest(request);
+    setAccountHolderName(request.account_holder_name);
+    setAccountNumber(request.account_number);
+    setBankName(request.bank_name || "");
+    setIfscCode(request.ifsc_code || "");
     setUploadDialogOpen(true);
   };
 
@@ -381,28 +472,57 @@ export default function BankStatementList() {
   };
 
   const handleSubmitUpload = async () => {
-    if (!uploadedFile?.s3_key || !uploadStatement) {
+    if (!uploadedFile?.s3_key || !uploadRequest) {
       setUploadError("Please upload a file first.");
+      return;
+    }
+
+    if (!accountHolderName.trim()) {
+      setUploadError("Account holder name is required.");
+      return;
+    }
+
+    if (!accountNumber.trim()) {
+      setUploadError("Account number is required.");
+      return;
+    }
+
+    if (!fromDate || !toDate) {
+      setUploadError("From date and To date are required.");
       return;
     }
 
     setSubmitLoading(true);
     try {
       const res = await post("/api/mobile/set-pdf-bank-statement", {
-        request_type: "success",
-        id: uploadStatement.id,
+        request_type: "upload",
         s3_key: uploadedFile.s3_key,
-        mobile_number: uploadStatement.mobile_number,
-        name: uploadStatement.name,
-        account_number: uploadStatement.account_number,
-        investigator_officier_name: uploadStatement.investigator_officier_name,
-        bank_name: uploadStatement.bank_name,
-        ifsc_code: uploadStatement.ifsc_code,
+        mobile_number: uploadRequest.mobile_number,
+        account_holder_name: accountHolderName.trim(),
+        account_number: accountNumber.trim(),
+        bank_name: bankName.trim() || null,
+        ifsc_code: ifscCode.trim() || null,
+        from_date: fromDate,
+        to_date: toDate,
       });
 
-      toast.success(res?.responseStatus?.message || "Statement uploaded successfully");
+      toast.success(res?.responseStatus?.message || "File uploaded successfully");
+
+      // Now grant access to this file for the user
+      // The upload creates/updates the statement, we need to grant_access separately
+      // Get the new file ID from the response if available
+      const newFileId = res?.responseData?.new_file?.id;
+      if (newFileId && uploadRequest) {
+        await post("/api/mobile/set-pdf-bank-statement", {
+          request_type: "grant_access",
+          request_id: uploadRequest.id,
+          file_ids: [newFileId],
+          grant_all: false,
+        });
+      }
+
       resetUploadDialog();
-      fetchStatements();
+      fetchData();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { responseStatus?: { message?: string } } } };
       const errMsg = err?.response?.data?.responseStatus?.message || "Submission failed";
@@ -441,27 +561,28 @@ export default function BankStatementList() {
 
   const resetUploadDialog = () => {
     setUploadDialogOpen(false);
-    setUploadStatement(null);
+    setUploadRequest(null);
     setFile(null);
     setProgress(0);
     setUploadedFile(null);
     setUploadError("");
+    setAccountHolderName("");
+    setAccountNumber("");
+    setBankName("");
+    setIfscCode("");
+    setFromDate("");
+    setToDate("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
   // Table columns
-  const columns: Column<BankStatement>[] = [
-    // {
-    //   title: "ID",
-    //   dataIndex: "id",
-    //   width: 60,
-    // },
+  const columns: Column<BankStatementAccessRequest>[] = [
     {
       title: "Requested User Email",
       dataIndex: "request_user_email",
-      render: (val: string, record: BankStatement) => (
+      render: (val: string, record: BankStatementAccessRequest) => (
         <ClickableCell record={record}>
           <span className="text-medium">{val}</span>
         </ClickableCell>
@@ -469,8 +590,8 @@ export default function BankStatementList() {
     },
     {
       title: "Acc Holder Name",
-      dataIndex: "name",
-      render: (val: string, record: BankStatement) => (
+      dataIndex: "account_holder_name",
+      render: (val: string, record: BankStatementAccessRequest) => (
         <ClickableCell record={record}>
           <span className="font-sm">{val}</span>
         </ClickableCell>
@@ -479,7 +600,7 @@ export default function BankStatementList() {
     {
       title: "Mobile",
       dataIndex: "mobile_number",
-      render: (val: string, record: BankStatement) => (
+      render: (val: string, record: BankStatementAccessRequest) => (
         <ClickableCell record={record}>
           <span className="font-mono text-sm">{val}</span>
         </ClickableCell>
@@ -488,7 +609,7 @@ export default function BankStatementList() {
     {
       title: "Account No.",
       dataIndex: "account_number",
-      render: (val: string, record: BankStatement) => (
+      render: (val: string, record: BankStatementAccessRequest) => (
         <ClickableCell record={record}>
           <span className="font-mono text-sm">{val}</span>
         </ClickableCell>
@@ -497,34 +618,53 @@ export default function BankStatementList() {
     {
       title: "Bank",
       dataIndex: "bank_name",
-      render: (val: string, record: BankStatement) => (
+      render: (val: string, record: BankStatementAccessRequest) => (
         <ClickableCell record={record}>
-          <span>{val}</span>
+          <span>{val || "-"}</span>
         </ClickableCell>
       ),
     },
     {
       title: "IFSC",
       dataIndex: "ifsc_code",
-      render: (val: string, record: BankStatement) => (
+      render: (val: string, record: BankStatementAccessRequest) => (
         <ClickableCell record={record}>
-          <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{val}</span>
+          {val ? (
+            <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{val}</span>
+          ) : (
+            <span>-</span>
+          )}
         </ClickableCell>
       ),
     },
     {
       title: "Investigator",
       dataIndex: "investigator_officier_name",
-      render: (val: string, record: BankStatement) => (
+      render: (val: string, record: BankStatementAccessRequest) => (
         <ClickableCell record={record}>
           <span>{val}</span>
         </ClickableCell>
       ),
     },
     {
+      title: "Files Access",
+      dataIndex: "accessible_file_ids",
+      render: (val: number[], record: BankStatementAccessRequest) => {
+        const statement = statementData.find(d =>
+          d.mobile_number === record.mobile_number && d.account_number === record.account_number
+        );
+        const totalFiles = statement?.total_files || 0;
+        return (
+          <span className="text-sm">
+            {val.length} / {totalFiles} files
+          </span>
+        );
+      },
+    },
+    {
       title: "History",
       dataIndex: "status_history",
-      render: (_: StatusHistoryItem[], record: BankStatement) => (
+      render: (_: StatusHistoryItem[], record: BankStatementAccessRequest) => (
         <Button
           variant="outline"
           size="sm"
@@ -539,7 +679,7 @@ export default function BankStatementList() {
     {
       title: "Action",
       dataIndex: "status",
-      render: (status: StatementStatus, record: BankStatement) => (
+      render: (status: StatementStatus, record: BankStatementAccessRequest) => (
         <div className="flex items-center gap-2">
           {status === "pending" && (
             <>
@@ -576,11 +716,11 @@ export default function BankStatementList() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleOpenUploadDialog(record)}
+                onClick={() => handleOpenGrantFilesDialog(record)}
                 className="gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
               >
-                <Upload className="h-4 w-4" />
-                Upload
+                <CheckCircle className="h-4 w-4" />
+                Grant Access
               </Button>
               <Button
                 variant="outline"
@@ -686,8 +826,8 @@ export default function BankStatementList() {
     return params.toString();
   }, [currentPage, pageSize, filters.status, debouncedSearch]);
 
-  // Fetch statements
-  const fetchStatements = useCallback(async () => {
+  // Fetch data
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -696,15 +836,17 @@ export default function BankStatementList() {
         `/api/mobile/get-all-bank-statements?${queryParams}`
       );
 
-      const records = res.responseData?.records || [];
+      const statements = res.responseData?.statements || [];
+      const requests = res.responseData?.access_requests || [];
       const paginationData = res.responseData?.pagination || null;
 
-      setStatements(records);
+      setStatementData(statements);
+      setAccessRequests(requests);
       setPagination(paginationData);
     } catch (err: unknown) {
       const errorMessage =
         (err as { response?: { data?: { responseStatus?: { message?: string } } } })?.response
-          ?.data?.responseStatus?.message || "Failed to fetch statements";
+          ?.data?.responseStatus?.message || "Failed to fetch data";
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -713,8 +855,8 @@ export default function BankStatementList() {
 
   // Fetch on mount and when params change
   useEffect(() => {
-    fetchStatements();
-  }, [fetchStatements]);
+    fetchData();
+  }, [fetchData]);
 
   // Handler functions
   const handleSearchChange = (value: string) => {
@@ -730,7 +872,7 @@ export default function BankStatementList() {
   };
 
   const handleRefresh = () => {
-    fetchStatements();
+    fetchData();
     toast.success("Refreshed");
   };
 
@@ -756,7 +898,7 @@ export default function BankStatementList() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Bank Statements</h1>
             <p className="text-muted-foreground text-sm">
-              View and manage all bank statement requests
+              View and manage bank statement access requests
             </p>
           </div>
         </div>
@@ -771,20 +913,18 @@ export default function BankStatementList() {
             <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
             Refresh
           </Button>
-          <Button size="sm" onClick={() => setNewRecordOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Record
-          </Button>
         </div>
       </div>
 
       {/* Filters */}
-      <BankStatementFilter
+      <AccessRequestFilter
         filters={filters}
         onSearchChange={handleSearchChange}
         onStatusChange={handleStatusChange}
         onClearFilters={handleClearFilters}
         pagination={pagination}
+        searchPlaceholder="Search by name, mobile, account, bank, IFSC..."
+        resultLabel="access requests"
       />
 
       {/* Results Summary */}
@@ -795,7 +935,7 @@ export default function BankStatementList() {
               <span className="font-medium text-foreground">
                 {pagination?.total_count || 0}
               </span>{" "}
-              statements found
+              access requests found
             </div>
             {hasActiveFilters && (
               <Badge variant="secondary" className="text-xs">
@@ -817,7 +957,7 @@ export default function BankStatementList() {
         <div className="overflow-x-auto overflow-y-auto custom-scrollbar max-h-[600px]">
           <CustomTable
             columns={columns}
-            dataSource={statements}
+            dataSource={accessRequests}
             loading={loading}
             scroll={{ x: true }}
           />
@@ -837,61 +977,54 @@ export default function BankStatementList() {
         )}
       </Card>
 
-      {/* New Record Dialog */}
-      <BankStatementNewRecord
-        open={newRecordOpen}
-        onOpenChange={setNewRecordOpen}
-        onSuccess={handleRefresh}
-      />
-
       {/* History Dialog */}
       <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
         <DialogContent className="w-[90vw] max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />
-              Statement History
+              Access Request History
             </DialogTitle>
-            {selectedStatement && (
+            {selectedRequest && (
               <DialogDescription className="flex flex-col gap-1">
                 <span>
-                  <span className="font-medium text-foreground">{selectedStatement.name}</span>
+                  <span className="font-medium text-foreground">{selectedRequest.account_holder_name}</span>
                   {" - "}
-                  {selectedStatement.bank_name}
+                  {selectedRequest.bank_name || "Unknown Bank"}
                 </span>
                 <span className="text-xs">
-                  Account: {selectedStatement.account_number} | Mobile: {selectedStatement.mobile_number}
+                  Account: {selectedRequest.account_number} | Mobile: {selectedRequest.mobile_number}
                 </span>
               </DialogDescription>
             )}
           </DialogHeader>
 
           {/* Current Status */}
-          {selectedStatement && (
+          {selectedRequest && (
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
               <span className="text-sm text-muted-foreground">Current Status:</span>
               <Badge
                 variant="outline"
-                className={cn("gap-1", getStatusBadge(selectedStatement.status).className)}
+                className={cn("gap-1", getStatusBadge(selectedRequest.status).className)}
               >
-                {getStatusBadge(selectedStatement.status).label}
+                {getStatusBadge(selectedRequest.status).label}
               </Badge>
             </div>
           )}
 
           {/* Timeline */}
           <div className="flex-1 overflow-auto custom-scrollbar pr-2">
-            {selectedStatement?.status_history && selectedStatement.status_history.length > 0 ? (
+            {selectedRequest?.status_history && selectedRequest.status_history.length > 0 ? (
               <div className="relative pl-8 py-4">
                 {/* Vertical Line */}
                 <div className="absolute left-[15px] top-0 bottom-0 w-0.5 bg-border" />
 
                 {/* Timeline Items */}
                 <div className="space-y-6">
-                  {selectedStatement.status_history.map((history, index) => {
+                  {selectedRequest.status_history.map((history, index) => {
                     const config = getStatusConfig(history.action);
                     const Icon = config.icon;
-                    const isLast = index === selectedStatement.status_history.length - 1;
+                    const isLast = index === selectedRequest.status_history.length - 1;
 
                     return (
                       <div key={index} className="relative">
@@ -919,7 +1052,7 @@ export default function BankStatementList() {
                                 config.color
                               )}
                             >
-                              {history.action}
+                              {history.action.replace(/_/g, " ")}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {formatDate(history.timestamp)}
@@ -929,7 +1062,7 @@ export default function BankStatementList() {
                           {/* User Email */}
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                             <Mail className="h-3.5 w-3.5" />
-                            <span>{history.user_email}</span>
+                            <span>{history.by_user_email}</span>
                           </div>
 
                           {/* Details */}
@@ -940,28 +1073,34 @@ export default function BankStatementList() {
                                   <span className="font-medium">Reason:</span> {String(history.details.reason)}
                                 </div>
                               )}
-                              {history.details.name && (
+                              {history.details.account_holder_name && (
                                 <div>
-                                  <span className="font-medium text-muted-foreground">Name:</span>{" "}
-                                  {String(history.details.name)}
+                                  <span className="font-medium text-muted-foreground">Account Holder:</span>{" "}
+                                  {String(history.details.account_holder_name)}
                                 </div>
                               )}
-                              {history.details.bank_name && (
+                              {history.details.investigator_officier_name && (
                                 <div>
-                                  <span className="font-medium text-muted-foreground">Bank:</span>{" "}
-                                  {String(history.details.bank_name)}
+                                  <span className="font-medium text-muted-foreground">Investigator:</span>{" "}
+                                  {String(history.details.investigator_officier_name)}
                                 </div>
                               )}
-                              {history.details.s3_key && (
+                              {history.details.previous_status && (
                                 <div>
-                                  <span className="font-medium text-muted-foreground">File:</span>{" "}
-                                  <span className="font-mono">{String(history.details.s3_key)}</span>
+                                  <span className="font-medium text-muted-foreground">Previous Status:</span>{" "}
+                                  {String(history.details.previous_status)}
                                 </div>
                               )}
-                              {history.details.filename && (
+                              {history.details.grant_all !== undefined && (
                                 <div>
-                                  <span className="font-medium text-muted-foreground">Filename:</span>{" "}
-                                  {String(history.details.filename)}
+                                  <span className="font-medium text-muted-foreground">Grant All:</span>{" "}
+                                  {history.details.grant_all ? "Yes" : "No"}
+                                </div>
+                              )}
+                              {history.details.granted_file_ids && history.details.granted_file_ids.length > 0 && (
+                                <div>
+                                  <span className="font-medium text-muted-foreground">Granted File IDs:</span>{" "}
+                                  {history.details.granted_file_ids.join(", ")}
                                 </div>
                               )}
                             </div>
@@ -993,23 +1132,120 @@ export default function BankStatementList() {
         </DialogContent>
       </Dialog>
 
-      {/* Upload Dialog for Approved Statements */}
+      {/* Grant Files Dialog */}
+      <Dialog open={grantFilesDialogOpen} onOpenChange={(open) => !open && resetGrantFilesDialog()}>
+        <DialogContent className="w-[90vw] max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Grant File Access
+            </DialogTitle>
+            {grantRequest && (
+              <DialogDescription className="flex flex-col gap-1">
+                <span>
+                  <span className="font-medium text-foreground">{grantRequest.account_holder_name}</span>
+                  {" - "}
+                  {grantRequest.account_number}
+                </span>
+                <span className="text-xs">
+                  Select files to grant access to user: {grantRequest.request_user_email}
+                </span>
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Grant All Checkbox */}
+            <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
+              <Checkbox
+                id="grantAll"
+                checked={grantAllFiles}
+                onCheckedChange={handleToggleGrantAll}
+              />
+              <Label htmlFor="grantAll" className="cursor-pointer font-medium">
+                Grant access to all files ({availableFiles.length})
+              </Label>
+            </div>
+
+            {/* File List */}
+            <div className="space-y-2">
+              <Label>Available Files:</Label>
+              <div className="border rounded-lg divide-y max-h-[300px] overflow-y-auto">
+                {availableFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors"
+                  >
+                    <Checkbox
+                      id={`file-${file.id}`}
+                      checked={selectedFileIds.includes(file.id)}
+                      onCheckedChange={() => handleToggleFile(file.id)}
+                      disabled={grantAllFiles}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-primary flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">{file.filename}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {file.from_date} to {file.to_date}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Upload New File Option */}
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetGrantFilesDialog();
+                if (grantRequest) handleOpenUploadDialog(grantRequest);
+              }}
+              className="w-full"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Upload New File Instead
+            </Button>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={resetGrantFilesDialog}
+              disabled={grantLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleGrantFiles}
+              disabled={grantLoading || (selectedFileIds.length === 0 && !grantAllFiles)}
+              loading={grantLoading}
+            >
+              Grant Access
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Dialog */}
       <Dialog open={uploadDialogOpen} onOpenChange={(open) => !open && resetUploadDialog()}>
         <DialogContent className="w-[90vw] max-w-lg max-h-[90vh] overflow-y-auto custom-scrollbar">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-primary" />
-              Upload Bank Statement
+              Upload Bank Statement PDF
             </DialogTitle>
-            {uploadStatement && (
+            {uploadRequest && (
               <DialogDescription className="flex flex-col gap-1">
                 <span>
-                  <span className="font-medium text-foreground">{uploadStatement.name}</span>
+                  <span className="font-medium text-foreground">{uploadRequest.account_holder_name}</span>
                   {" - "}
-                  {uploadStatement.bank_name}
+                  {uploadRequest.mobile_number}
                 </span>
                 <span className="text-xs">
-                  Account: {uploadStatement.account_number} | Mobile: {uploadStatement.mobile_number}
+                  Requested by: {uploadRequest.request_user_email}
                 </span>
               </DialogDescription>
             )}
@@ -1048,6 +1284,68 @@ export default function BankStatementList() {
                       <ExternalLink className="h-3.5 w-3.5" />
                       View File
                     </a>
+                  </div>
+                </div>
+
+                {/* Form Fields */}
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="accountHolderName">Account Holder Name <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="accountHolderName"
+                      placeholder="Enter account holder name"
+                      value={accountHolderName}
+                      onChange={(e) => setAccountHolderName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="accountNumber">Account Number <span className="text-destructive">*</span></Label>
+                    <Input
+                      id="accountNumber"
+                      placeholder="Enter account number"
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="bankName">Bank Name</Label>
+                      <Input
+                        id="bankName"
+                        placeholder="Enter bank name"
+                        value={bankName}
+                        onChange={(e) => setBankName(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="ifscCode">IFSC Code</Label>
+                      <Input
+                        id="ifscCode"
+                        placeholder="Enter IFSC code"
+                        value={ifscCode}
+                        onChange={(e) => setIfscCode(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="fromDate">From Date <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="fromDate"
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="toDate">To Date <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="toDate"
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1216,32 +1514,32 @@ export default function BankStatementList() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="capitalize">
-              {confirmAction} Statement
+              {confirmAction?.replace("_", " ")} Access Request
             </DialogTitle>
             <DialogDescription>
               {confirmAction === "approve" &&
-                "Are you sure you want to approve this statement request?"}
+                "Are you sure you want to approve this access request?"}
               {confirmAction === "reject" &&
-                "Are you sure you want to reject this statement request?"}
-              {confirmAction === "delete" &&
-                "Are you sure you want to delete this statement? This action cannot be undone."}
+                "Are you sure you want to reject this access request?"}
+              {confirmAction === "delete_request" &&
+                "Are you sure you want to delete this request? This action cannot be undone."}
             </DialogDescription>
           </DialogHeader>
 
-          {actionStatement && (
+          {actionRequest && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="p-4 bg-secondary/30 rounded-lg space-y-2"
             >
               <div className="flex items-center gap-2 text-sm">
-                <span className="font-medium">{actionStatement.name}</span>
+                <span className="font-medium">{actionRequest.account_holder_name}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{actionStatement.bank_name}</span>
+                <span>{actionRequest.bank_name || "Unknown Bank"} - {actionRequest.account_number}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{actionStatement.account_number}</span>
+                <span>Investigator: {actionRequest.investigator_officier_name}</span>
               </div>
             </motion.div>
           )}
@@ -1278,7 +1576,7 @@ export default function BankStatementList() {
             </Button>
             <Button
               variant={
-                confirmAction === "delete" || confirmAction === "reject"
+                confirmAction === "delete_request" || confirmAction === "reject"
                   ? "destructive"
                   : "default"
               }
@@ -1291,7 +1589,7 @@ export default function BankStatementList() {
             >
               {confirmAction === "approve" && "Approve"}
               {confirmAction === "reject" && "Reject"}
-              {confirmAction === "delete" && "Delete"}
+              {confirmAction === "delete_request" && "Delete"}
             </Button>
           </DialogFooter>
         </DialogContent>

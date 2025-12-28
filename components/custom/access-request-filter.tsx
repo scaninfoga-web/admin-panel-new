@@ -13,10 +13,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Search, Filter, X } from "lucide-react";
-import type { BankStatementFilterState, StatementStatus, PaginationInfo } from "@/types/bank-statement";
+
+// Generic status type
+export type AccessRequestStatus = "pending" | "approved" | "rejected" | "success";
 
 interface StatusOption {
-  value: StatementStatus | "all";
+  value: AccessRequestStatus | "all";
   label: string;
 }
 
@@ -28,21 +30,39 @@ const STATUS_OPTIONS: StatusOption[] = [
   { value: "success", label: "Success" },
 ];
 
-interface BankStatementFilterProps {
-  filters: BankStatementFilterState;
-  onSearchChange: (value: string) => void;
-  onStatusChange: (value: StatementStatus | "all") => void;
-  onClearFilters: () => void;
-  pagination: PaginationInfo | null;
+export interface AccessRequestFilterState {
+  search: string;
+  status: AccessRequestStatus | "all";
 }
 
-export function BankStatementFilter({
+export interface PaginationInfo {
+  page: number;
+  page_size: number;
+  total_count: number;
+  total_pages: number;
+  has_next: boolean;
+  has_previous: boolean;
+}
+
+interface AccessRequestFilterProps {
+  filters: AccessRequestFilterState;
+  onSearchChange: (value: string) => void;
+  onStatusChange: (value: AccessRequestStatus | "all") => void;
+  onClearFilters: () => void;
+  pagination: PaginationInfo | null;
+  searchPlaceholder?: string;
+  resultLabel?: string;
+}
+
+export function AccessRequestFilter({
   filters,
   onSearchChange,
   onStatusChange,
   onClearFilters,
   pagination,
-}: BankStatementFilterProps) {
+  searchPlaceholder = "Search by name, mobile, investigator...",
+  resultLabel = "access requests",
+}: AccessRequestFilterProps) {
   const hasActiveFilters = filters.search || filters.status !== "all";
 
   return (
@@ -52,7 +72,7 @@ export function BankStatementFilter({
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, mobile, account, bank, IFSC..."
+            placeholder={searchPlaceholder}
             value={filters.search}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-9"
@@ -64,7 +84,7 @@ export function BankStatementFilter({
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select
             value={filters.status}
-            onValueChange={(value) => onStatusChange(value as StatementStatus | "all")}
+            onValueChange={(value) => onStatusChange(value as AccessRequestStatus | "all")}
           >
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Status" />
@@ -95,7 +115,7 @@ export function BankStatementFilter({
             <span className="font-medium text-foreground">
               {pagination?.total_count || 0}
             </span>{" "}
-            statements found
+            {resultLabel} found
           </span>
           {hasActiveFilters && (
             <Badge variant="secondary" className="text-xs">
