@@ -25,6 +25,7 @@ interface CustomTableProps<T> {
   loading?: boolean;
   scroll?: {
     x?: boolean | string | number;
+    y?: number;
   };
 }
 
@@ -36,7 +37,8 @@ export function CustomTable<T extends object>({
 }: CustomTableProps<T>) {
   return (
     <div
-      className={`overflow-auto border border-slate-600 ${scroll?.x ? 'overflow-x-auto' : ''}}`}
+      className={`overflow-auto border border-slate-600 custom-scrollbar ${scroll?.x ? 'overflow-x-auto' : ''}`}
+      style={scroll?.y ? { maxHeight: scroll.y } : undefined}
     >
       <Table>
         <TableHeader>

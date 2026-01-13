@@ -182,11 +182,6 @@ const UserActivityList: React.FC = () => {
     toast.info("Export functionality coming soon");
   };
 
-  const getStatusCounts = () => {
-    const successCount = tableData.filter(item => item.status === 'success').length;
-    const failedCount = tableData.filter(item => item.status === 'failed').length;
-    return { successCount, failedCount };
-  };
 
 //   const { successCount, failedCount } = getStatusCounts();
 

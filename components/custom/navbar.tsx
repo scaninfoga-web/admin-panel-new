@@ -76,6 +76,7 @@ const Navbar: React.FC = () => {
     { label: "Set Credentials", href: "/setCredentials" },
     { label: "User Activites", href: "/user-activities" },
     { label: "S3-Upload", href: "/s3" },
+    { label: "API-Pricing", href: "/api_pricing" },
   ];
 
   return (
