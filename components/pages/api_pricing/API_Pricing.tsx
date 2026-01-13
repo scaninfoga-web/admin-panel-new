@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { get, post } from "@/lib/api";
 import { Globe2, Loader2, RefreshCw, Search } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface ApiPricing {
   api_name: string;
@@ -44,6 +45,7 @@ export default function API_Pricing() {
         });
         await populateData();
       } catch (error) {
+        toast.error("Failed to update pricing");
         console.error(error);
       } finally {
         setUpdatingApi(null);
@@ -59,7 +61,6 @@ export default function API_Pricing() {
       setTableData(res?.responseData || []);
       setFilteredData(res?.responseData || []);
     } catch (error) {
-      console.error(error);
     } finally {
       setLoading(false);
     }
