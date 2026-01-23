@@ -34,6 +34,10 @@ export interface StatusHistoryDetails {
   holder_name?: string;
   account_holder_name?: string;
   investigator_officier_name?: string;
+  ifsc_code?: string;
+  bank_name?: string;
+  from_date?: string;
+  to_date?: string;
   previous_status?: string;
   grant_all?: boolean;
   granted_file_ids?: number[];
@@ -57,6 +61,8 @@ export interface BankStatementAccessRequest {
   ifsc_code: string | null;
   bank_name: string | null;
   investigator_officier_name: string;
+  from_date: string;
+  to_date: string;
   request_user_email: string;
   status: StatementStatus;
   accessible_file_ids: number[];

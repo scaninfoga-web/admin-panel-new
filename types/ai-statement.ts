@@ -32,6 +32,8 @@ export interface AIStatusHistoryDetails {
   reason?: string;
   name?: string;
   investigator_officier_name?: string;
+  from_date?: string;
+  to_date?: string;
   previous_status?: string;
   grant_all?: boolean;
   granted_file_ids?: number[];
@@ -53,6 +55,8 @@ export interface AIStatementAccessRequest {
   mobile_number: string;
   name: string;
   investigator_officier_name: string;
+  from_date: string;
+  to_date: string;
   request_user_email: string;
   status: AIStatementStatus;
   accessible_file_ids: number[];

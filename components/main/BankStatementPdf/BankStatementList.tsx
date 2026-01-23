@@ -655,6 +655,18 @@ export default function BankStatementList() {
       ),
     },
     {
+      title: "Requested Period",
+      dataIndex: "from_date",
+      render: (_: string, record: BankStatementAccessRequest) => (
+        <ClickableCell record={record}>
+          <div className="text-xs">
+            <div className="font-medium">{record.from_date || "-"}</div>
+            <div className="text-muted-foreground">to {record.to_date || "-"}</div>
+          </div>
+        </ClickableCell>
+      ),
+    },
+    {
       title: "Files Access",
       dataIndex: "accessible_file_ids",
       render: (val: number[], record: BankStatementAccessRequest) => {
@@ -1012,6 +1024,9 @@ export default function BankStatementList() {
                 <span className="text-xs">
                   Account: {selectedRequest.account_number} | Mobile: {selectedRequest.mobile_number}
                 </span>
+                <span className="text-xs">
+                  Period: {selectedRequest.from_date} to {selectedRequest.to_date}
+                </span>
               </DialogDescription>
             )}
           </DialogHeader>
@@ -1118,6 +1133,12 @@ export default function BankStatementList() {
                                 <div>
                                   <span className="font-medium text-muted-foreground">Granted File IDs:</span>{" "}
                                   {history.details.granted_file_ids.join(", ")}
+                                </div>
+                              )}
+                              {(history.details.from_date || history.details.to_date) && (
+                                <div>
+                                  <span className="font-medium text-muted-foreground">Requested Period:</span>{" "}
+                                  {history.details.from_date} to {history.details.to_date}
                                 </div>
                               )}
                             </div>
