@@ -25,12 +25,14 @@ export default function API_Pricing() {
         setFilteredData(tableData);
         return;
       }
-      const filteredData = tableData.filter(
-        (item) =>
-          item.api_name.toLowerCase().includes(searchTerm) ||
-          item.currentprice.toString().includes(searchTerm)
-      );
-      setFilteredData(filteredData);
+      const filtered = tableData
+        .filter(
+          (item) =>
+            item.api_name.toLowerCase().includes(searchTerm) ||
+            item.currentprice.toString().includes(searchTerm)
+        )
+        .sort((a, b) => a.api_name.localeCompare(b.api_name));
+      setFilteredData(filtered);
     },
     [tableData]
   );
@@ -58,8 +60,12 @@ export default function API_Pricing() {
     try {
       setLoading(true);
       const res = await get("/api/mobile/get-all-api-pricing");
-      setTableData(res?.responseData || []);
-      setFilteredData(res?.responseData || []);
+      const sortedData = (res?.responseData || []).sort(
+        (a: ApiPricing, b: ApiPricing) =>
+          a.api_name.localeCompare(b.api_name)
+      );
+      setTableData(sortedData);
+      setFilteredData(sortedData);
     } catch (error) {
     } finally {
       setLoading(false);
