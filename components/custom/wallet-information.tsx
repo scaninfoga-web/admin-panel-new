@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '../ui/button';
 import type { WalletInformationProps } from '@/lib/types';
 import { Loader } from './custom-loader';
-import { formatISOtoDDMMYYYY } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { Modal } from './modal';
 import {WalletUpdateForm} from './wallet-update-form';
@@ -71,11 +71,11 @@ export const WalletInformation: React.FC<PropsUtil> = ({user_id}) => {
           </div>
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-white">Last Transaction Date:</h3>
-            <p className="text-gray-300">{formatISOtoDDMMYYYY(data.last_successful_transaction?.created_at)}</p>
+            <p className="text-gray-300">{formatDate(data.last_successful_transaction?.created_at)}</p>
           </div>
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-white">Last Transaction Date:</h3>
-            <p className="text-gray-300">{formatISOtoDDMMYYYY(data.last_successful_transaction?.created_at)}</p>
+            <p className="text-gray-300">{formatDate(data.last_successful_transaction?.created_at)}</p>
           </div>
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-white">Total credited</h3>

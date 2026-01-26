@@ -2,7 +2,7 @@
 
 import { User, Mail, Crown, Smile, Meh, Frown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatISOtoDDMMYYYY } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import type { ProfileInformationCardProps } from '@/lib/types';
 import { Loader } from './custom-loader';
 import { Badge } from '../ui/badge';
@@ -104,7 +104,7 @@ export const ProfileInformationCard: React.FC<PropsUtil> = ({data, loading}) => 
           <div className="flex items-center justify-between border-b border-slate-600 py-2">
             <span className="text-slate-300">Date Joined</span>
             <span className="font-medium text-white">
-              {formatISOtoDDMMYYYY(data.date_joined)}
+              {formatDate(data.date_joined)}
             </span>
           </div>
           <div className="flex items-center justify-between py-3">
