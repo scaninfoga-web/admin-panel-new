@@ -1,12 +1,9 @@
 {
   "compilerOptions": {
     "ignoreDeprecations": "5.0",
-    "lib": [
-      "ESNext","dom", "dom.iterable"
-    ],
-    "baseUrl": ".",
+    "lib": ["ESNext", "dom", "dom.iterable"],
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./*"]
     },
     "target": "ESNext",
     "module": "Preserve",
@@ -14,6 +11,7 @@
     "jsx": "preserve",
     "allowJs": true,
     "moduleResolution": "bundler",
+    "allowArbitraryExtensions": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
@@ -35,10 +33,9 @@
   "include": [
     "next-env.d.ts",
     ".next/types/**/*.ts",
+    "**/*.d.ts",
     "**/*.ts",
     "**/*.tsx"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }

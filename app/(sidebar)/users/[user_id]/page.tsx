@@ -1,14 +1,11 @@
-import UserProfile from "@/components/pages/user-profile/UserProfile";
+import { Loader } from "@/components/custom/custom-loader";
+import UserDetails from "@/components/pages/users/UserDetails";
+import { Suspense } from "react";
 
-interface PageProps {
-  params: {
-    user_id: number;
-  };
-}
-
-export default function Page({params}: PageProps) {
-    const {user_id} = params
-    return (
-        <UserProfile user_id={user_id} />
-    )
+export default function Page({ params }: { params: { user_id: string } }) {
+  return (
+    <Suspense fallback={<Loader />}>
+      <UserDetails userId={params.user_id} />
+    </Suspense>
+  );
 }

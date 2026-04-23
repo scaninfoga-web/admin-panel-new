@@ -65,6 +65,14 @@ export default {
           5: emerald[100],
         },
       },
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 1.6s ease-in-out infinite',
+      },
     },
   },
   plugins: [require('tailwindcss-animate')],

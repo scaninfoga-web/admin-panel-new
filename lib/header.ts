@@ -1,0 +1,229 @@
+"use client";
+
+import axios from "axios";
+
+const SESSION_KEY = "client_info";
+
+// ─── Collectors ───────────────────────────────────────────────────────────────
+
+function getBrowser(): string {
+  const ua = navigator.userAgent;
+  if (ua.includes("Firefox")) return "Firefox";
+  if (ua.includes("SamsungBrowser")) return "Samsung Browser";
+  if (ua.includes("Opera") || ua.includes("OPR")) return "Opera";
+  if (ua.includes("Edg")) return "Edge";
+  if (ua.includes("Chrome")) return "Chrome";
+  if (ua.includes("Safari")) return "Safari";
+  return "Unknown";
+}
+
+function getDevice(): string {
+  const ua = navigator.userAgent;
+  if (/iPhone/.test(ua)) return "iPhone";
+  if (/iPad/.test(ua)) return "iPad";
+  if (/Android/.test(ua)) return "Android";
+  if (/Windows/.test(ua)) return "Windows PC";
+  if (/Macintosh/.test(ua)) return "Mac";
+  if (/Linux/.test(ua)) return "Linux PC";
+  return "Unknown";
+}
+
+function getDeviceType(): string {
+  const ua = navigator.userAgent;
+  if (/Mobi|Android.*Mobile|iPhone/.test(ua)) return "mobile";
+  if (/Tablet|iPad/.test(ua)) return "tablet";
+  return "desktop";
+}
+
+function getGpuRenderer(): string | null {
+  try {
+    const canvas = document.createElement("canvas");
+    const gl =
+      canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+    if (!gl) return null;
+    const ext = (gl as WebGLRenderingContext).getExtension(
+      "WEBGL_debug_renderer_info",
+    );
+    if (!ext) return null;
+    return (gl as WebGLRenderingContext).getParameter(
+      ext.UNMASKED_RENDERER_WEBGL,
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function getBatteryInfo(): Promise<{
+  level: string | null;
+  charging: string | null;
+}> {
+  try {
+    const nav = navigator as any;
+    if (!nav.getBattery) return { level: null, charging: null };
+    const battery = await nav.getBattery();
+    return {
+      level: `${Math.round(battery.level * 100)}%`,
+      charging: String(battery.charging),
+    };
+  } catch {
+    return { level: null, charging: null };
+  }
+}
+
+async function getMediaDevices(): Promise<{
+  cameras: string;
+  microphones: string;
+}> {
+  try {
+    if (!navigator.mediaDevices?.enumerateDevices) {
+      return { cameras: "0", microphones: "0" };
+    }
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter((d) => d.kind === "videoinput").length;
+    const microphones = devices.filter((d) => d.kind === "audioinput").length;
+    return { cameras: String(cameras), microphones: String(microphones) };
+  } catch {
+    return { cameras: "0", microphones: "0" };
+  }
+}
+
+function getGeolocation(): Promise<{
+  latitude: string | null;
+  longitude: string | null;
+}> {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      resolve({ latitude: null, longitude: null });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) =>
+        resolve({
+          latitude: String(pos.coords.latitude),
+          longitude: String(pos.coords.longitude),
+        }),
+      () => resolve({ latitude: null, longitude: null }),
+      { timeout: 5000, maximumAge: 300000 },
+    );
+  });
+}
+
+async function getIpInfo(): Promise<{
+  publicIp: string | null;
+  isp: string | null;
+  asn: string | null;
+  city: string | null;
+  country: string | null;
+  ip: string | null;
+  latitude: string | null;
+  longitude: string | null;
+}> {
+  try {
+    const { data } = await axios.get("https://ipapi.co/json/");
+    return {
+      publicIp: data.ip || null,
+      isp: data.org || null,
+      asn: data.asn || null,
+      city: data.city || null,
+      country: data.country_name || null,
+      ip: data.ip || null,
+      latitude: data.latitude ? String(data.latitude) : null,
+      longitude: data.longitude ? String(data.longitude) : null,
+    };
+  } catch {
+    return {
+      publicIp: null,
+      isp: null,
+      asn: null,
+      city: null,
+      country: null,
+      ip: null,
+      latitude: null,
+      longitude: null,
+    };
+  }
+}
+
+function detectPossibleIoT(): boolean {
+  const cores = navigator.hardwareConcurrency || 0;
+  const nav = navigator as any;
+  const mem = nav.deviceMemory || 0;
+  return cores <= 2 && mem <= 1 && getDeviceType() !== "desktop";
+}
+
+// ─── Collect all client info ──────────────────────────────────────────────────
+
+async function collectClientInfo(): Promise<Record<string, any>> {
+  const [geo, ipInfo, battery, media] = await Promise.all([
+    getGeolocation(),
+    getIpInfo(),
+    getBatteryInfo(),
+    getMediaDevices(),
+  ]);
+
+  const nav = navigator as any;
+
+  return {
+    latitude: ipInfo.latitude || geo.latitude,
+    longitude: ipInfo.longitude || geo.longitude,
+    ip: ipInfo.ip,
+    browser: getBrowser(),
+    device: getDevice(),
+    userAgent: navigator.userAgent,
+    platform: navigator.platform,
+    language: navigator.language,
+    cookiesEnabled: navigator.cookieEnabled,
+    javascriptEnabled: true,
+    touchSupport: "ontouchstart" in window || navigator.maxTouchPoints > 0,
+    deviceType: getDeviceType(),
+    cpuCores: navigator.hardwareConcurrency || null,
+    memory: nav.deviceMemory ? `${nav.deviceMemory} GB` : null,
+    screenSize: `${window.screen.width}x${window.screen.height}`,
+    batteryLevel: battery.level,
+    isCharging: battery.charging,
+    gpuRenderer: getGpuRenderer(),
+    cameras: media.cameras,
+    microphones: media.microphones,
+    publicIp: ipInfo.publicIp,
+    isp: ipInfo.isp,
+    asn: ipInfo.asn,
+    city: ipInfo.city,
+    country: ipInfo.country,
+    possibleIoT: detectPossibleIoT(),
+  };
+}
+
+// ─── Session-cached getter (single fetch per browser session) ─────────────────
+
+let fetchPromise: Promise<Record<string, any>> | null = null;
+
+export function getClientInfo(): Promise<Record<string, any>> {
+  // Return from sessionStorage if already fetched this session
+  try {
+    const cached = sessionStorage.getItem(SESSION_KEY);
+    if (cached) {
+      let data = JSON.parse(cached);
+      console.log("Using cached client info", data);
+      return Promise.resolve(data);
+    }
+  } catch {}
+
+  // Single in-flight promise — no duplicate fetches
+  if (!fetchPromise) {
+    fetchPromise = collectClientInfo()
+      .then((info) => {
+        try {
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(info));
+        } catch {}
+        return info;
+      })
+      .catch(() => ({}));
+  }
+
+  return fetchPromise;
+}
+
+// Auto-fetch on page load so it's ready before first API call
+if (typeof window !== "undefined") {
+  getClientInfo();
+}

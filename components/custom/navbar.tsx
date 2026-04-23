@@ -1,142 +1,147 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useDispatch, useSelector } from "react-redux";
-import { type AppDispatch, type RootState } from "@/redux/store";
-import { logout } from "@/redux/userSlice";
-import { cn, getClientInfoUtil } from "@/lib/utils";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
+import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
-import { getApiList } from "@/redux/apiListSlice";
-import { setInfo } from "@/redux/infoSlice";
-import { Button } from "../ui/button";
+import { getCookie, deleteCookie } from "cookies-next";
+import { LogOut, ChevronDown } from "lucide-react";
+
+const VALID_ENVS = ["DEVELOPMENT", "PRODUCTION"] as const;
 
 const Navbar: React.FC = () => {
-  const token = useSelector((state: RootState) => state.user.token);
-  const dispatch = useDispatch<AppDispatch>();
   const router = useRouter();
   const pathname = usePathname();
 
-  const validEnvs = ["DEVELOPMENT", "PRODUCTION"];
-
+  const [token, setToken] = useState<string | null>(null);
   const [env, setEnv] = useState<string>("DEVELOPMENT");
+  const [envOpen, setEnvOpen] = useState(false);
+
   useEffect(() => {
-    const fetchInfo = async () => {
+    const raw = getCookie("accessToken");
+    if (raw) {
       try {
-        const info = await getClientInfoUtil();
-        dispatch(setInfo({ ...info, fetched: true }));
-      } catch (e) {
-        console.error("Failed to fetch client info", e);
+        setToken(typeof raw === "string" ? JSON.parse(raw) : null);
+      } catch {
+        setToken(typeof raw === "string" ? raw : null);
       }
-    };
-    fetchInfo();
-  }, [dispatch]);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("environment");
-    const envValue =
-      typeof saved === "string" && validEnvs.includes(saved)
-        ? saved
-        : "DEVELOPMENT";
-
-    setEnv(envValue);
-
-    if (saved !== envValue) {
-      localStorage.setItem("environment", envValue);
     }
   }, []);
 
   useEffect(() => {
-    if (token) {
-      dispatch(getApiList());
-    }
-  }, [token]);
+    const saved = localStorage.getItem("environment");
+    const envValue =
+      typeof saved === "string" &&
+      VALID_ENVS.includes(saved as (typeof VALID_ENVS)[number])
+        ? saved
+        : "DEVELOPMENT";
+    setEnv(envValue);
+    if (saved !== envValue) localStorage.setItem("environment", envValue);
+  }, []);
 
-  const handleChange = (value: string) => {
+  const handleEnvChange = (value: string) => {
     setEnv(value);
     localStorage.setItem("environment", value);
+    setEnvOpen(false);
   };
 
   const handleLogout = () => {
-    dispatch(logout());
-    router.refresh();
+    deleteCookie("accessToken");
+    deleteCookie("user");
+    sessionStorage.removeItem("client_info");
+    setToken(null);
+    router.replace("/");
   };
 
-  const navLinks = [
-    { label: "Users", href: "/users" },
-    { label: "Transactions", href: "/transactions" },
-    { label: "Set Credentials", href: "/setCredentials" },
-    { label: "User Activites", href: "/user-activities" },
-    { label: "S3-Upload", href: "/s3" },
-    { label: "API-Pricing", href: "/api_pricing" },
-  ];
+  if (pathname === "/") return null;
 
   return (
-    <header className="w-full fixed top-0 bg-background px-6 z-10 border-b">
-      <div className="w-full flex items-center justify-between">
-        <div className="mb-2">
+    <header className="fixed top-0 z-50 w-full border-b border-white/[0.06] bg-[#05070B]/80 backdrop-blur-xl">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center justify-between px-5">
+        {/* Logo */}
+        <div className="flex shrink-0 items-center">
           <Image
             src="https://d29bvka1s4r8lj.cloudfront.net/scaninfoga_stuff/upper_logo.png"
             alt="scaninfoga"
-            width={200}
+            width={140}
             height={0}
-            objectFit="contain"
+            style={{ objectFit: "contain" }}
             unoptimized
-            priority={true}
-            loading="eager"
+            priority
           />
         </div>
 
-        {token && pathname !== "/" && (
-          <div className="flex items-center gap-6 py-2 px-10 rounded-full mt-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
+        {/* Spacer — nav links moved to sidebar */}
+        <div className="flex-1" />
+
+        {/* Right section */}
+        <div className="flex items-center gap-3">
+          {/* Env badge */}
+          {token && (
+            <div className="relative">
+              <button
+                onClick={() => setEnvOpen(!envOpen)}
                 className={cn(
-                  "font-medium hover:text-emerald-600 transition-colors",
-                  pathname === link.href &&
-                    "underline underline-offset-4 decoration-emerald-500 text-emerald-500"
+                  "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition",
+                  env === "PRODUCTION"
+                    ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
                 )}
               >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-        )}
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    env === "PRODUCTION" ? "bg-amber-400" : "bg-emerald-400",
+                  )}
+                />
+                {env === "PRODUCTION" ? "PROD" : "DEV"}
+                <ChevronDown className="h-3 w-3 opacity-60" />
+              </button>
 
-        <div>
-          {token && pathname !== "/" && (
-            <>
-              <div className="p-4 inline-block">{env}</div>
-              |
-              <Button
-              
-                onClick={handleLogout}
-                className="text-sm font-medium text-red-600 hover:underline bg-transparent"
-              >
-                Logout
-              </Button>
-            </>
+              {envOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setEnvOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full z-50 mt-1.5 w-40 overflow-hidden rounded-lg border border-white/10 bg-[#0C0F16] shadow-xl">
+                    {VALID_ENVS.map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => handleEnvChange(v)}
+                        className={cn(
+                          "flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium transition",
+                          env === v
+                            ? "bg-white/[0.06] text-white"
+                            : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full",
+                            v === "PRODUCTION"
+                              ? "bg-amber-400"
+                              : "bg-emerald-400",
+                          )}
+                        />
+                        {v === "PRODUCTION" ? "Production" : "Development"}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
-          {!token && (
-            <Select value={env} onValueChange={handleChange}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select environment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DEVELOPMENT">DEVELOPMENT</SelectItem>
-                <SelectItem value="PRODUCTION">PRODUCTION</SelectItem>
-              </SelectContent>
-            </Select>
+
+          {/* Logout */}
+          {token && (
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium text-red-400 transition hover:bg-red-500/10"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Logout
+            </button>
           )}
         </div>
       </div>
