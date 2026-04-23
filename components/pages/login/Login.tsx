@@ -37,8 +37,9 @@ import {
 
 /* ─── Helpers ─── */
 function saveCredentials(accessToken: string, user: any) {
-  setCookie("accessToken", JSON.stringify(accessToken), { path: "/" });
-  setCookie("user", JSON.stringify(user), { path: "/" });
+  const maxAge = 59 * 60; // 59 minutes in seconds
+  setCookie("accessToken", JSON.stringify(accessToken), { path: "/", maxAge });
+  setCookie("user", JSON.stringify(user), { path: "/", maxAge });
 }
 
 type OtpChannel = "EMAIL" | "WHATSAPP";

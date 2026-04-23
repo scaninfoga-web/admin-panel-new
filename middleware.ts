@@ -3,10 +3,10 @@ import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const { cookies, nextUrl } = request;
-  const accessToken = cookies.get('accessToken');
+  const accessToken = cookies.get('accessToken')?.value;
 
   const isRootPath = nextUrl.pathname === '/';
-  const isAuthenticated = !!accessToken;
+  const isAuthenticated = !!accessToken && accessToken !== '""';
 
   if (isAuthenticated) {
     if (isRootPath) {

@@ -118,30 +118,89 @@ async function getIpInfo(): Promise<{
   latitude: string | null;
   longitude: string | null;
 }> {
-  try {
-    const { data } = await axios.get("https://ipapi.co/json/");
-    return {
-      publicIp: data.ip || null,
-      isp: data.org || null,
-      asn: data.asn || null,
-      city: data.city || null,
-      country: data.country_name || null,
-      ip: data.ip || null,
-      latitude: data.latitude ? String(data.latitude) : null,
-      longitude: data.longitude ? String(data.longitude) : null,
-    };
-  } catch {
-    return {
-      publicIp: null,
-      isp: null,
-      asn: null,
-      city: null,
-      country: null,
-      ip: null,
-      latitude: null,
-      longitude: null,
-    };
+  const endpoints = [
+    { url: "https://ipinfo.io/json", name: "ipinfo.io" },
+    { url: "https://ipwhois.app/json/", name: "ipwhois.app" },
+    { url: "https://ipapi.co/json/", name: "ipapi.co" },
+    { url: "http://ip-api.com/json/", name: "ip-api.com" },
+  ];
+
+  for (const endpoint of endpoints) {
+    try {
+      const { data } = await axios.get(endpoint.url, { timeout: 3000 });
+      console.log(`IP data from ${endpoint.name}:`, data);
+
+      if (endpoint.name === "ipinfo.io") {
+        if (!data.ip) continue;
+        const [lat, lon] = (data.loc || "").split(",");
+        return {
+          publicIp: data.ip || null,
+          isp: data.org || null,
+          asn: data.org ? data.org.split(" ")[0] : null,
+          city: data.city || null,
+          country: data.country || null,
+          ip: data.ip || null,
+          latitude: lat || null,
+          longitude: lon || null,
+        };
+      }
+
+      if (endpoint.name === "ipwhois.app") {
+        if (data.success === false) continue;
+        return {
+          publicIp: data.ip || null,
+          isp: data.isp || data.org || null,
+          asn: data.asn || null,
+          city: data.city || null,
+          country: data.country_code || data.country || null,
+          ip: data.ip || null,
+          latitude: data.latitude ? String(data.latitude) : null,
+          longitude: data.longitude ? String(data.longitude) : null,
+        };
+      }
+
+      if (endpoint.name === "ipapi.co") {
+        if (data.error) continue;
+        return {
+          publicIp: data.ip || null,
+          isp: data.org || null,
+          asn: data.asn || null,
+          city: data.city || null,
+          country: data.country || data.country_name || null,
+          ip: data.ip || null,
+          latitude: data.latitude ? String(data.latitude) : null,
+          longitude: data.longitude ? String(data.longitude) : null,
+        };
+      }
+
+      if (endpoint.name === "ip-api.com") {
+        if (data.status !== "success") continue;
+        return {
+          publicIp: data.query || null,
+          isp: data.isp || data.org || null,
+          asn: data.as ? data.as.split(" ")[0] : null,
+          city: data.city || null,
+          country: data.countryCode || data.country || null,
+          ip: data.query || null,
+          latitude: data.lat ? String(data.lat) : null,
+          longitude: data.lon ? String(data.lon) : null,
+        };
+      }
+    } catch (e) {
+      console.warn(`Failed to fetch from ${endpoint.name}`);
+    }
   }
+
+  return {
+    publicIp: null,
+    isp: null,
+    asn: null,
+    city: null,
+    country: null,
+    ip: null,
+    latitude: null,
+    longitude: null,
+  };
 }
 
 function detectPossibleIoT(): boolean {
@@ -164,8 +223,8 @@ async function collectClientInfo(): Promise<Record<string, any>> {
   const nav = navigator as any;
 
   return {
-    latitude: ipInfo.latitude || geo.latitude,
-    longitude: ipInfo.longitude || geo.longitude,
+    latitude: geo.latitude || ipInfo.latitude,
+    longitude: geo.longitude || ipInfo.longitude,
     ip: ipInfo.ip,
     browser: getBrowser(),
     device: getDevice(),
@@ -198,13 +257,18 @@ async function collectClientInfo(): Promise<Record<string, any>> {
 let fetchPromise: Promise<Record<string, any>> | null = null;
 
 export function getClientInfo(): Promise<Record<string, any>> {
-  // Return from sessionStorage if already fetched this session
+  // Return from sessionStorage if already fetched this session AND has valid data
   try {
     const cached = sessionStorage.getItem(SESSION_KEY);
     if (cached) {
-      let data = JSON.parse(cached);
-      console.log("Using cached client info", data);
-      return Promise.resolve(data);
+      const data = JSON.parse(cached);
+      // Only use cache if it has valid IP and Country data
+      if (data.publicIp && data.country) {
+        console.log("Using cached client info", data);
+        return Promise.resolve(data);
+      }
+      console.warn("Cached client info incomplete, re-fetching...");
+      sessionStorage.removeItem(SESSION_KEY);
     }
   } catch {}
 
@@ -213,7 +277,10 @@ export function getClientInfo(): Promise<Record<string, any>> {
     fetchPromise = collectClientInfo()
       .then((info) => {
         try {
-          sessionStorage.setItem(SESSION_KEY, JSON.stringify(info));
+          // Only cache if the critical data was fetched successfully
+          if (info.publicIp && info.country) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(info));
+          }
         } catch {}
         return info;
       })

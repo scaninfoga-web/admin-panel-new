@@ -55,4 +55,5 @@ USER nextjs
 
 EXPOSE 3005
 
-CMD ["bun", "run", "start"]
+# --bun forces bun (not node) as the runtime for `next start`
+CMD ["bun", "--bun", "run", "start"]
