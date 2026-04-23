@@ -152,7 +152,6 @@ const MonitorLogs: React.FC = () => {
       } else if (!silent) {
         setRefreshing(true);
       }
-
       try {
         const params: Record<string, string> = {
           limit: String(PAGE_SIZE),
