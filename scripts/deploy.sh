@@ -135,7 +135,7 @@ else
 fi
 
 if ! $PING_CMD "$SERVER_IP" > /dev/null 2>&1; then
-  err "cannot reach ${SERVER_IP} — run: tailscale up"; exit 1
+  echo "ERROR: cannot reach ${SERVER_IP} — run: tailscale up" >&2; exit 1
 fi
 echo "Server reachable"
 
