@@ -42,6 +42,27 @@ fi
 # SSH key passphrase for git ops on server (optional — blank if key has no passphrase)
 SERVER_PASSWORD=$(grep -E '^SERVER_PASSWORD=' "$ENV_FILE" | cut -d= -f2- | tr -d '\r' || true)
 
+# ── Local ssh-agent: load the key once so push / scp / ssh don't each prompt ─
+LOCAL_KEY="${LOCAL_SSH_KEY:-$HOME/.ssh/id_ed25519}"
+_AGENT_STARTED=0
+if [[ -f "$LOCAL_KEY" ]]; then
+  # Start an agent only if one isn't already exported in this shell
+  if [[ -z "${SSH_AUTH_SOCK:-}" ]] || ! ssh-add -l > /dev/null 2>&1; then
+    eval "$(ssh-agent -s)" > /dev/null
+    _AGENT_STARTED=1
+  fi
+  # Add the key if not already loaded (prompts for passphrase once)
+  if ! ssh-add -l 2>/dev/null | grep -q "$(ssh-keygen -lf "$LOCAL_KEY" 2>/dev/null | awk '{print $2}')"; then
+    echo "Loading ${LOCAL_KEY} into ssh-agent (enter passphrase once)..."
+    ssh-add "$LOCAL_KEY"
+  fi
+fi
+cleanup() {
+  rm -f "${PROD_ENV_TMP:-}"
+  [[ "$_AGENT_STARTED" -eq 1 ]] && ssh-agent -k > /dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
 echo ""
 echo "=== Scaninfoga Admin Panel Deploy ==="
 
@@ -90,7 +111,7 @@ LOCAL_SHA=$(git rev-parse --short=8 HEAD)
 # Push
 git config advice.ignoredHook false 2>/dev/null || true
 echo "Pushing ${BRANCH} to origin..."
-git push origin "${BRANCH}" --quiet
+git push origin "${BRANCH}"
 echo "Pushed"
 
 # ── PHASE 2 — Stage local .env for upload ────────────────────────────────────
@@ -98,7 +119,6 @@ echo ""
 echo "-- Phase 2: Staging local .env"
 
 PROD_ENV_TMP=$(mktemp /tmp/.env.admin.XXXXXX)
-trap 'rm -f "${PROD_ENV_TMP}"' EXIT
 
 cp "$ENV_FILE" "$PROD_ENV_TMP"
 chmod 600 "$PROD_ENV_TMP"
