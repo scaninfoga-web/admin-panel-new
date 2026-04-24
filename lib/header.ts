@@ -8,65 +8,81 @@ const SESSION_KEY = "client_info";
 
 function getBrowser(): string {
   const ua = navigator.userAgent;
-  if (ua.includes("Firefox")) return "Firefox";
+  const nav = navigator as any;
+
+  if (nav.userAgentData?.brands) {
+    const brands = nav.userAgentData.brands.map((b: any) => b.brand).join(",");
+    if (brands.includes("Brave")) return "Brave";
+    if (brands.includes("Microsoft Edge") || brands.includes("Edge")) return "Edge";
+    if (brands.includes("Opera")) return "Opera";
+    if (brands.includes("Vivaldi")) return "Vivaldi";
+  }
+
+  if (ua.includes("Firefox") || ua.includes("FxiOS")) return "Firefox";
   if (ua.includes("SamsungBrowser")) return "Samsung Browser";
   if (ua.includes("Opera") || ua.includes("OPR")) return "Opera";
   if (ua.includes("Edg")) return "Edge";
-  if (ua.includes("Chrome")) return "Chrome";
-  if (ua.includes("Safari")) return "Safari";
+  if (ua.includes("Brave")) return "Brave";
+  if (ua.includes("Vivaldi")) return "Vivaldi";
+  if (ua.includes("UCBrowser")) return "UC Browser";
+  if (ua.includes("CriOS") || ua.includes("Chrome")) return "Chrome";
+  if (ua.includes("Safari") && !ua.includes("Chrome")) return "Safari";
   return "Unknown";
 }
 
 function getDevice(): string {
   const ua = navigator.userAgent;
-  if (/iPhone/.test(ua)) return "iPhone";
-  if (/iPad/.test(ua)) return "iPad";
+  const platform = navigator.platform || "";
+
+  if (/iPhone|iPod/.test(ua)) return "iPhone";
+  if (/iPad/.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "iPad";
   if (/Android/.test(ua)) return "Android";
-  if (/Windows/.test(ua)) return "Windows PC";
-  if (/Macintosh/.test(ua)) return "Mac";
-  if (/Linux/.test(ua)) return "Linux PC";
+  if (/Windows/.test(ua) || /Win16|Win32|Win64|Windows/.test(platform)) return "Windows PC";
+  if (/Macintosh|MacIntel|MacPPC|Mac68K/.test(ua) || /Mac/.test(platform)) return "Mac";
+  if (/Linux/.test(ua) || /Linux/.test(platform)) return "Linux PC";
   return "Unknown";
 }
 
 function getDeviceType(): string {
   const ua = navigator.userAgent;
-  if (/Mobi|Android.*Mobile|iPhone/.test(ua)) return "mobile";
-  if (/Tablet|iPad/.test(ua)) return "tablet";
+  const platform = navigator.platform || "";
+  if (/Mobi|Android.*Mobile|iPhone|iPod/.test(ua)) return "mobile";
+  if (/Tablet|iPad/.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "tablet";
   return "desktop";
 }
 
-function getGpuRenderer(): string | null {
+function getGpuRenderer(): string {
   try {
     const canvas = document.createElement("canvas");
     const gl =
       canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    if (!gl) return null;
+    if (!gl) return "Unknown";
     const ext = (gl as WebGLRenderingContext).getExtension(
       "WEBGL_debug_renderer_info",
     );
-    if (!ext) return null;
+    if (!ext) return "Unknown";
     return (gl as WebGLRenderingContext).getParameter(
       ext.UNMASKED_RENDERER_WEBGL,
     );
   } catch {
-    return null;
+    return "Unknown";
   }
 }
 
 async function getBatteryInfo(): Promise<{
-  level: string | null;
-  charging: string | null;
+  level: string;
+  charging: string;
 }> {
   try {
     const nav = navigator as any;
-    if (!nav.getBattery) return { level: null, charging: null };
+    if (!nav.getBattery) return { level: "Not Supported", charging: "Not Supported" };
     const battery = await nav.getBattery();
     return {
       level: `${Math.round(battery.level * 100)}%`,
       charging: String(battery.charging),
     };
   } catch {
-    return { level: null, charging: null };
+    return { level: "Not Supported", charging: "Not Supported" };
   }
 }
 
@@ -235,8 +251,8 @@ async function collectClientInfo(): Promise<Record<string, any>> {
     javascriptEnabled: true,
     touchSupport: "ontouchstart" in window || navigator.maxTouchPoints > 0,
     deviceType: getDeviceType(),
-    cpuCores: navigator.hardwareConcurrency || null,
-    memory: nav.deviceMemory ? `${nav.deviceMemory} GB` : null,
+    cpuCores: navigator.hardwareConcurrency || "Unknown",
+    memory: nav.deviceMemory ? `${nav.deviceMemory} GB` : "Not Supported",
     screenSize: `${window.screen.width}x${window.screen.height}`,
     batteryLevel: battery.level,
     isCharging: battery.charging,
