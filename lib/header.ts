@@ -372,6 +372,7 @@ export function getClientInfo(): Promise<Record<string, any>> {
     const cached = sessionStorage.getItem(SESSION_KEY);
     if (cached) {
       const data = JSON.parse(cached);
+      console.log("cached info", data);
       if (isValidInfo(data)) {
         return Promise.resolve(data);
       }
@@ -382,6 +383,7 @@ export function getClientInfo(): Promise<Record<string, any>> {
   if (!fetchPromise) {
     fetchPromise = collectClientInfo()
       .then((info) => {
+        console.log("client info", info);
         try {
           if (isValidInfo(info)) {
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(info));
