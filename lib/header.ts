@@ -2,7 +2,7 @@
 
 import axios from "axios";
 
-const SESSION_KEY = "client_info";
+const SESSION_KEY = "client_info_v2";
 const NA = "N/A";
 
 // ─── Collectors ───────────────────────────────────────────────────────────────
