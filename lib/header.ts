@@ -3,51 +3,71 @@
 import axios from "axios";
 
 const SESSION_KEY = "client_info";
+const NA = "N/A";
 
 // ─── Collectors ───────────────────────────────────────────────────────────────
 
 function getBrowser(): string {
-  const ua = navigator.userAgent;
+  const ua = navigator.userAgent || "";
   const nav = navigator as any;
 
-  if (nav.userAgentData?.brands) {
-    const brands = nav.userAgentData.brands.map((b: any) => b.brand).join(",");
-    if (brands.includes("Brave")) return "Brave";
-    if (brands.includes("Microsoft Edge") || brands.includes("Edge")) return "Edge";
-    if (brands.includes("Opera")) return "Opera";
-    if (brands.includes("Vivaldi")) return "Vivaldi";
-  }
+  try {
+    if (nav.userAgentData?.brands?.length) {
+      const brands = nav.userAgentData.brands
+        .map((b: any) => b.brand)
+        .join(",");
+      if (/Brave/i.test(brands)) return "Brave";
+      if (/Microsoft Edge|Edge/i.test(brands)) return "Edge";
+      if (/Opera/i.test(brands)) return "Opera";
+      if (/Vivaldi/i.test(brands)) return "Vivaldi";
+      if (/Chromium|Google Chrome/i.test(brands)) return "Chrome";
+    }
+  } catch {}
 
-  if (ua.includes("Firefox") || ua.includes("FxiOS")) return "Firefox";
-  if (ua.includes("SamsungBrowser")) return "Samsung Browser";
-  if (ua.includes("Opera") || ua.includes("OPR")) return "Opera";
-  if (ua.includes("Edg")) return "Edge";
-  if (ua.includes("Brave")) return "Brave";
-  if (ua.includes("Vivaldi")) return "Vivaldi";
-  if (ua.includes("UCBrowser")) return "UC Browser";
-  if (ua.includes("CriOS") || ua.includes("Chrome")) return "Chrome";
-  if (ua.includes("Safari") && !ua.includes("Chrome")) return "Safari";
-  return "Unknown";
+  if ((nav as any).brave?.isBrave) return "Brave";
+  if (/FxiOS|Firefox/i.test(ua)) return "Firefox";
+  if (/SamsungBrowser/i.test(ua)) return "Samsung Browser";
+  if (/OPR|Opera/i.test(ua)) return "Opera";
+  if (/Edg/i.test(ua)) return "Edge";
+  if (/Vivaldi/i.test(ua)) return "Vivaldi";
+  if (/UCBrowser/i.test(ua)) return "UC Browser";
+  if (/YaBrowser/i.test(ua)) return "Yandex";
+  if (/DuckDuckGo/i.test(ua)) return "DuckDuckGo";
+  if (/CriOS|Chrome|Chromium/i.test(ua)) return "Chrome";
+  if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return "Safari";
+  if (/MSIE|Trident/i.test(ua)) return "Internet Explorer";
+
+  return "Other Browser";
 }
 
 function getDevice(): string {
-  const ua = navigator.userAgent;
+  const ua = navigator.userAgent || "";
   const platform = navigator.platform || "";
+  const maxTouch = navigator.maxTouchPoints || 0;
 
-  if (/iPhone|iPod/.test(ua)) return "iPhone";
-  if (/iPad/.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "iPad";
-  if (/Android/.test(ua)) return "Android";
-  if (/Windows/.test(ua) || /Win16|Win32|Win64|Windows/.test(platform)) return "Windows PC";
-  if (/Macintosh|MacIntel|MacPPC|Mac68K/.test(ua) || /Mac/.test(platform)) return "Mac";
-  if (/Linux/.test(ua) || /Linux/.test(platform)) return "Linux PC";
-  return "Unknown";
+  if (/iPhone|iPod/i.test(ua)) return "iPhone";
+  if (/iPad/i.test(ua) || (platform === "MacIntel" && maxTouch > 1))
+    return "iPad";
+  if (/Android/i.test(ua)) return /Mobile/i.test(ua) ? "Android Phone" : "Android Tablet";
+  if (/Windows Phone/i.test(ua)) return "Windows Phone";
+  if (/Windows|Win16|Win32|Win64/i.test(ua + platform)) return "Windows PC";
+  if (/Macintosh|MacIntel|MacPPC|Mac68K|Mac/i.test(ua + platform)) return "Mac";
+  if (/CrOS/i.test(ua)) return "Chromebook";
+  if (/Linux/i.test(ua + platform)) return "Linux PC";
+  if (/SmartTV|TV/i.test(ua)) return "Smart TV";
+
+  return "Generic Device";
 }
 
 function getDeviceType(): string {
-  const ua = navigator.userAgent;
+  const ua = navigator.userAgent || "";
   const platform = navigator.platform || "";
-  if (/Mobi|Android.*Mobile|iPhone|iPod/.test(ua)) return "mobile";
-  if (/Tablet|iPad/.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1)) return "tablet";
+  const maxTouch = navigator.maxTouchPoints || 0;
+
+  if (/Mobi|Android.*Mobile|iPhone|iPod|Windows Phone/i.test(ua))
+    return "mobile";
+  if (/Tablet|iPad/i.test(ua) || (platform === "MacIntel" && maxTouch > 1))
+    return "tablet";
   return "desktop";
 }
 
@@ -55,17 +75,21 @@ function getGpuRenderer(): string {
   try {
     const canvas = document.createElement("canvas");
     const gl =
-      canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
-    if (!gl) return "Unknown";
-    const ext = (gl as WebGLRenderingContext).getExtension(
-      "WEBGL_debug_renderer_info",
-    );
-    if (!ext) return "Unknown";
-    return (gl as WebGLRenderingContext).getParameter(
-      ext.UNMASKED_RENDERER_WEBGL,
-    );
+      (canvas.getContext("webgl") as WebGLRenderingContext | null) ||
+      (canvas.getContext("experimental-webgl") as WebGLRenderingContext | null);
+    if (!gl) return "Software Renderer";
+
+    const ext = gl.getExtension("WEBGL_debug_renderer_info");
+    if (ext) {
+      const renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+      if (renderer) return String(renderer);
+    }
+
+    const fallback = gl.getParameter(gl.RENDERER);
+    if (fallback) return String(fallback);
+    return "Software Renderer";
   } catch {
-    return "Unknown";
+    return "Software Renderer";
   }
 }
 
@@ -75,15 +99,23 @@ async function getBatteryInfo(): Promise<{
 }> {
   try {
     const nav = navigator as any;
-    if (!nav.getBattery) return { level: "Not Supported", charging: "Not Supported" };
-    const battery = await nav.getBattery();
-    return {
-      level: `${Math.round(battery.level * 100)}%`,
-      charging: String(battery.charging),
-    };
-  } catch {
-    return { level: "Not Supported", charging: "Not Supported" };
-  }
+    if (typeof nav.getBattery === "function") {
+      const battery = await nav.getBattery();
+      return {
+        level:
+          typeof battery.level === "number"
+            ? `${Math.round(battery.level * 100)}%`
+            : "100%",
+        charging:
+          typeof battery.charging === "boolean"
+            ? String(battery.charging)
+            : "true",
+      };
+    }
+  } catch {}
+
+  // Desktop / unsupported → assume plugged-in full battery so backend gets valid values.
+  return { level: "100%", charging: "true" };
 }
 
 async function getMediaDevices(): Promise<{
@@ -91,16 +123,17 @@ async function getMediaDevices(): Promise<{
   microphones: string;
 }> {
   try {
-    if (!navigator.mediaDevices?.enumerateDevices) {
-      return { cameras: "0", microphones: "0" };
+    if (navigator.mediaDevices?.enumerateDevices) {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cameras = devices.filter((d) => d.kind === "videoinput").length;
+      const microphones = devices.filter((d) => d.kind === "audioinput").length;
+      return {
+        cameras: String(Math.max(cameras, 0)),
+        microphones: String(Math.max(microphones, 0)),
+      };
     }
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    const cameras = devices.filter((d) => d.kind === "videoinput").length;
-    const microphones = devices.filter((d) => d.kind === "audioinput").length;
-    return { cameras: String(cameras), microphones: String(microphones) };
-  } catch {
-    return { cameras: "0", microphones: "0" };
-  }
+  } catch {}
+  return { cameras: "0", microphones: "0" };
 }
 
 function getGeolocation(): Promise<{
@@ -124,106 +157,156 @@ function getGeolocation(): Promise<{
   });
 }
 
-async function getIpInfo(): Promise<{
-  publicIp: string | null;
-  isp: string | null;
-  asn: string | null;
-  city: string | null;
-  country: string | null;
-  ip: string | null;
-  latitude: string | null;
-  longitude: string | null;
-}> {
+type IpInfo = {
+  publicIp: string;
+  isp: string;
+  asn: string;
+  city: string;
+  country: string;
+  ip: string;
+  latitude: string;
+  longitude: string;
+};
+
+function emptyIpInfo(): IpInfo {
+  return {
+    publicIp: NA,
+    isp: NA,
+    asn: NA,
+    city: NA,
+    country: NA,
+    ip: NA,
+    latitude: NA,
+    longitude: NA,
+  };
+}
+
+function s(v: unknown, fallback = NA): string {
+  if (v === null || v === undefined) return fallback;
+  const str = String(v).trim();
+  return str.length ? str : fallback;
+}
+
+async function getIpInfo(): Promise<IpInfo> {
   const endpoints = [
     { url: "https://ipinfo.io/json", name: "ipinfo.io" },
     { url: "https://ipwhois.app/json/", name: "ipwhois.app" },
     { url: "https://ipapi.co/json/", name: "ipapi.co" },
-    { url: "http://ip-api.com/json/", name: "ip-api.com" },
+    { url: "https://ip-api.com/json/", name: "ip-api.com" },
   ];
 
   for (const endpoint of endpoints) {
     try {
       const { data } = await axios.get(endpoint.url, { timeout: 3000 });
-      console.log(`IP data from ${endpoint.name}:`, data);
 
       if (endpoint.name === "ipinfo.io") {
-        if (!data.ip) continue;
-        const [lat, lon] = (data.loc || "").split(",");
+        if (!data?.ip) continue;
+        const [lat, lon] = String(data.loc || "").split(",");
         return {
-          publicIp: data.ip || null,
-          isp: data.org || null,
-          asn: data.org ? data.org.split(" ")[0] : null,
-          city: data.city || null,
-          country: data.country || null,
-          ip: data.ip || null,
-          latitude: lat || null,
-          longitude: lon || null,
+          publicIp: s(data.ip),
+          isp: s(data.org),
+          asn: s(data.org ? String(data.org).split(" ")[0] : ""),
+          city: s(data.city),
+          country: s(data.country),
+          ip: s(data.ip),
+          latitude: s(lat),
+          longitude: s(lon),
         };
       }
 
       if (endpoint.name === "ipwhois.app") {
-        if (data.success === false) continue;
+        if (data?.success === false || !data?.ip) continue;
         return {
-          publicIp: data.ip || null,
-          isp: data.isp || data.org || null,
-          asn: data.asn || null,
-          city: data.city || null,
-          country: data.country_code || data.country || null,
-          ip: data.ip || null,
-          latitude: data.latitude ? String(data.latitude) : null,
-          longitude: data.longitude ? String(data.longitude) : null,
+          publicIp: s(data.ip),
+          isp: s(data.isp || data.org),
+          asn: s(data.asn),
+          city: s(data.city),
+          country: s(data.country_code || data.country),
+          ip: s(data.ip),
+          latitude: s(data.latitude),
+          longitude: s(data.longitude),
         };
       }
 
       if (endpoint.name === "ipapi.co") {
-        if (data.error) continue;
+        if (data?.error || !data?.ip) continue;
         return {
-          publicIp: data.ip || null,
-          isp: data.org || null,
-          asn: data.asn || null,
-          city: data.city || null,
-          country: data.country || data.country_name || null,
-          ip: data.ip || null,
-          latitude: data.latitude ? String(data.latitude) : null,
-          longitude: data.longitude ? String(data.longitude) : null,
+          publicIp: s(data.ip),
+          isp: s(data.org),
+          asn: s(data.asn),
+          city: s(data.city),
+          country: s(data.country || data.country_name),
+          ip: s(data.ip),
+          latitude: s(data.latitude),
+          longitude: s(data.longitude),
         };
       }
 
       if (endpoint.name === "ip-api.com") {
-        if (data.status !== "success") continue;
+        if (data?.status !== "success") continue;
         return {
-          publicIp: data.query || null,
-          isp: data.isp || data.org || null,
-          asn: data.as ? data.as.split(" ")[0] : null,
-          city: data.city || null,
-          country: data.countryCode || data.country || null,
-          ip: data.query || null,
-          latitude: data.lat ? String(data.lat) : null,
-          longitude: data.lon ? String(data.lon) : null,
+          publicIp: s(data.query),
+          isp: s(data.isp || data.org),
+          asn: s(data.as ? String(data.as).split(" ")[0] : ""),
+          city: s(data.city),
+          country: s(data.countryCode || data.country),
+          ip: s(data.query),
+          latitude: s(data.lat),
+          longitude: s(data.lon),
         };
       }
-    } catch (e) {
-      console.warn(`Failed to fetch from ${endpoint.name}`);
+    } catch {
+      // try next endpoint
     }
   }
 
-  return {
-    publicIp: null,
-    isp: null,
-    asn: null,
-    city: null,
-    country: null,
-    ip: null,
-    latitude: null,
-    longitude: null,
-  };
+  return emptyIpInfo();
 }
 
-function detectPossibleIoT(): boolean {
+function estimateMemoryGB(deviceType: string): number {
+  if (deviceType === "mobile") return 4;
+  if (deviceType === "tablet") return 6;
+  return 8;
+}
+
+function getMemory(deviceType: string): string {
+  const nav = navigator as any;
+  if (typeof nav.deviceMemory === "number" && nav.deviceMemory > 0) {
+    return `${nav.deviceMemory} GB`;
+  }
+  return `${estimateMemoryGB(deviceType)} GB`;
+}
+
+function getCpuCores(): string {
+  const cores = navigator.hardwareConcurrency;
+  if (typeof cores === "number" && cores > 0) return String(cores);
+  return "1";
+}
+
+function getScreenSize(): string {
+  try {
+    const w = window.screen?.width || window.innerWidth || 0;
+    const h = window.screen?.height || window.innerHeight || 0;
+    if (w > 0 && h > 0) return `${w}x${h}`;
+  } catch {}
+  return "0x0";
+}
+
+function getLanguage(): string {
+  return s(navigator.language || (navigator as any).userLanguage, "en-US");
+}
+
+function getPlatform(): string {
+  const nav = navigator as any;
+  const uaPlatform = nav.userAgentData?.platform;
+  return s(uaPlatform || navigator.platform, "Unknown Platform");
+}
+
+function detectPossibleIoT(deviceType: string): boolean {
   const cores = navigator.hardwareConcurrency || 0;
   const nav = navigator as any;
   const mem = nav.deviceMemory || 0;
-  return cores <= 2 && mem <= 1 && getDeviceType() !== "desktop";
+  return cores > 0 && cores <= 2 && mem > 0 && mem <= 1 && deviceType !== "desktop";
 }
 
 // ─── Collect all client info ──────────────────────────────────────────────────
@@ -236,35 +319,36 @@ async function collectClientInfo(): Promise<Record<string, any>> {
     getMediaDevices(),
   ]);
 
-  const nav = navigator as any;
+  const deviceType = getDeviceType();
 
   return {
-    latitude: geo.latitude || ipInfo.latitude,
-    longitude: geo.longitude || ipInfo.longitude,
-    ip: ipInfo.ip,
+    latitude: s(geo.latitude || ipInfo.latitude),
+    longitude: s(geo.longitude || ipInfo.longitude),
+    ip: s(ipInfo.ip),
     browser: getBrowser(),
     device: getDevice(),
-    userAgent: navigator.userAgent,
-    platform: navigator.platform,
-    language: navigator.language,
-    cookiesEnabled: navigator.cookieEnabled,
+    userAgent: s(navigator.userAgent, "Unknown UA"),
+    platform: getPlatform(),
+    language: getLanguage(),
+    cookiesEnabled: !!navigator.cookieEnabled,
     javascriptEnabled: true,
-    touchSupport: "ontouchstart" in window || navigator.maxTouchPoints > 0,
-    deviceType: getDeviceType(),
-    cpuCores: navigator.hardwareConcurrency || "Unknown",
-    memory: nav.deviceMemory ? `${nav.deviceMemory} GB` : "Not Supported",
-    screenSize: `${window.screen.width}x${window.screen.height}`,
+    touchSupport:
+      "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0,
+    deviceType,
+    cpuCores: getCpuCores(),
+    memory: getMemory(deviceType),
+    screenSize: getScreenSize(),
     batteryLevel: battery.level,
     isCharging: battery.charging,
     gpuRenderer: getGpuRenderer(),
     cameras: media.cameras,
     microphones: media.microphones,
-    publicIp: ipInfo.publicIp,
-    isp: ipInfo.isp,
-    asn: ipInfo.asn,
-    city: ipInfo.city,
-    country: ipInfo.country,
-    possibleIoT: detectPossibleIoT(),
+    publicIp: s(ipInfo.publicIp),
+    isp: s(ipInfo.isp),
+    asn: s(ipInfo.asn),
+    city: s(ipInfo.city),
+    country: s(ipInfo.country),
+    possibleIoT: detectPossibleIoT(deviceType),
   };
 }
 
@@ -272,35 +356,40 @@ async function collectClientInfo(): Promise<Record<string, any>> {
 
 let fetchPromise: Promise<Record<string, any>> | null = null;
 
+function isValidInfo(data: any): boolean {
+  return (
+    data &&
+    typeof data === "object" &&
+    data.publicIp &&
+    data.publicIp !== NA &&
+    data.country &&
+    data.country !== NA
+  );
+}
+
 export function getClientInfo(): Promise<Record<string, any>> {
-  // Return from sessionStorage if already fetched this session AND has valid data
   try {
     const cached = sessionStorage.getItem(SESSION_KEY);
     if (cached) {
       const data = JSON.parse(cached);
-      // Only use cache if it has valid IP and Country data
-      if (data.publicIp && data.country) {
-        console.log("Using cached client info", data);
+      if (isValidInfo(data)) {
         return Promise.resolve(data);
       }
-      console.warn("Cached client info incomplete, re-fetching...");
       sessionStorage.removeItem(SESSION_KEY);
     }
   } catch {}
 
-  // Single in-flight promise — no duplicate fetches
   if (!fetchPromise) {
     fetchPromise = collectClientInfo()
       .then((info) => {
         try {
-          // Only cache if the critical data was fetched successfully
-          if (info.publicIp && info.country) {
+          if (isValidInfo(info)) {
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(info));
           }
         } catch {}
         return info;
       })
-      .catch(() => ({}));
+      .catch(() => collectClientInfo().catch(() => ({})));
   }
 
   return fetchPromise;
